@@ -1,0 +1,42 @@
+{
+  "name": "cr-crud-extension",
+  "displayName": "CR CRUD Extension",
+  "description": "A VS Code extension that opens a WebView to create CRUD support.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.77.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mbanem/cr-crud-extension.git"
+  },
+  "license": "MIT",
+  "publisher": "mbanem",
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "clear;tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "prepackage": "pnpm run compile",
+    "package": "vsce package --no-dependencies",
+    "pak": "tsc -p ./; code --uninstall-extension mbanem.cr-crud-extension; rm /home/mili/TEST/cr-crud-extension/cr-crud-extension-0.0.1.vsix; vsce package --no-dependencies; VERSION=$(jq -r '.version' /home/mili/TEST/cr-crud-extension/package.json); code --install-extension /home/mili/TEST/cr-crud-extension/cr-crud-extension-${VERSION}.vsix;"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.77.0",
+    "typescript": "^5.4.0",
+    "vscode": "^1.1.79"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "cr-crud-extension.createCrudSupport",
+        "title": "Create CRUD Support"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+// See https://go.microsoft.com/fwlink/?LinkId=733558
+// for the documentation about the tasks.json format
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "pak",
+      "problemMatcher": [],
+      "label": "npm: pak",
+      "detail": "tsc -p ./; code --uninstall-extension mbanem.cr-crud-extension; rm /home/mili/TEST/cr-crud-extension/cr-crud-extension-0.0.1.vsix; vsce package --no-dependencies; VERSION=$(jq -r '.version' /home/mili/TEST/cr-crud-extension/package.json); code --install-extension /home/mili/TEST/cr-crud-extension/cr-crud-extension-${VERSION}.vsix;"
+    }
+  ]
+}
