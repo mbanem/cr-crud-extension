@@ -1,0 +1,176 @@
+import * as vscode from 'vscode';
+
+export function activate(context: vscode.ExtensionContext) {
+  const outputChannel = vscode.window.createOutputChannel('WebView Logs');
+  let panel: vscode.WebviewPanel | undefined;
+  const disposable = vscode.commands.registerCommand('cr-crud-extension.createCrudSupport', () => {
+    if (panel) {
+            panel.reveal(vscode.ViewColumn.One);
+    } else {
+      panel = vscode.window.createWebviewPanel(
+          'crCrudSupport',
+          'Create CRUD Support',
+          vscode.ViewColumn.One,
+          {
+              enableScripts: true,
+              localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
+              retainContextWhenHidden: true 
+          }
+      );
+
+      // Generate nonce
+      const nonce = getNonce();
+      panel.webview.onDidReceiveMessage(
+        (msg) => {
+          if (msg.command === 'createCrudSupport') {
+            const { componentName, routeName, fieldNames } = msg.payload as {
+              componentName: string;
+              routeName: string;
+              fieldNames: string[];
+            };
+            // Empty body for now
+            outputChannel.appendLine(`[WebView] Received payload:', ${componentName}, ${routeName}, ${fieldNames.toString()}`);
+          } else if(msg.command==='log'){
+            console.log(`[WebView] ${msg.text}`);
+            // Or log to output channel
+            outputChannel.appendLine(`[WebView] ${msg.text}`);
+          }
+        },
+        undefined,
+        context.subscriptions
+      );
+      panel.webview.html = getWebviewContent(panel.webview, context.extensionUri,nonce);
+    }
+  });
+
+  context.subscriptions.push(disposable);
+}
+
+export function deactivate() {}
+
+function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, nonce: string): string {
+  vscode.window.showInformationMessage('Bane getWebviewContent vscode.Uri!');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline';">
+  <style>
+    body { font-family: sans-serif; padding: 1rem; }
+    label { display: block; margin-top: 1rem; }
+    input { width: 12rem; padding: 0.5rem; margin-top: 0.25rem; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; }
+    .fields-list { margin-top: 0.5rem; }
+    .field-pill { display: inline-block; padding: 4px 8px; margin: 2px;
+      background: #ddd; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <h2>Create CRUD Support</h2>
+
+  <label>Component Name
+    <input id="componentName" type="text" />
+  </label>
+
+  <label>Route Folder Name
+    <input id="routeName" type="text" />
+  </label>
+
+  <label>Add Field Name
+    <input id="addField" type="text" onkeyup="addFieldName(event)" value='caption' data-nonce="${nonce}"/>
+  </label>
+  <label>Add Field Name
+    <button onclick="addFieldName()" data-nonce="${nonce}">add field name</button>
+  </label>
+  <div class="fields-list" id="fieldsList">FieldsList</div>
+
+  <button id="createBtn">Create CRUD Support</button>
+
+  <script nonce="${nonce}">
+
+    function logToExtension(message) {
+      // Post message to the extension
+      vscode.postMessage({
+          command: 'log',
+          text: message
+      });
+    }
+    const vscode = acquireVsCodeApi();
+
+    let componentName = '';
+    let routeName = '';
+    let fields = [];
+
+    const componentNameEl = document.getElementById('componentName');
+    const routeNameEl = document.getElementById('routeName');
+    const addFieldEl = document.getElementById('addField');
+    const fieldsListEl = document.getElementById('fieldsList');
+    const createBtn = document.getElementById('createBtn');
+
+    componentNameEl.addEventListener('input', e => componentName = e.target.value);
+    routeNameEl.addEventListener('input', e => routeName = e.target.value);
+
+    // window.addFieldName = function(event) {
+    //   if (event.key !== 'Enter') return;
+    //   const val = addFieldEl.value.trim();
+    //   if (val && !fields.includes(val)) {
+    //     fields.push(val);
+    //     renderFields();
+    //   }
+    //   addFieldEl.value = '';
+    // }
+
+    function addFieldName(){
+      const nonce = event.target.dataset.nonce;
+      logToExtension('addFieldName is called')
+      try{
+        const val = document.getElementById('addField').value.trim();
+        if (val) {
+          fields.push(val);
+          renderFields();
+        }
+      }finally{}
+      addFieldEl.value = '';
+    }
+    addFieldEl.addEventListener('keyup', (event) => {
+      const nonce = event.target.dataset.nonce;
+      logToExtension('keyup')
+      if (event.key !== 'Enter') return;
+      // const v = addFieldEl.value.trim();
+      const v = addFieldEl.value.trim()
+      if (!v) {
+        return;
+      }
+      fields.push(v);
+      // renderFields();
+      fieldNameEl.value = '';
+    });
+    function renderFields() {
+      logToExtension('renderFields')
+      fieldsListEl.innerHTML = '';
+      fields.forEach(f => {
+        const p = document.createElement('p');
+        p.className = 'field-pill';
+        p.textContent = f;
+        fieldsListEl.appendChild(p);
+      });
+    }
+
+    createBtn.addEventListener('click', () => {
+      const payload = { componentName, routeName, fieldNames: fields };
+      vscode.postMessage({ command: 'createCrudSupport', payload });
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function getNonce() {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
