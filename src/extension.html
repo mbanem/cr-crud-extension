@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    .grid-wrapper {
+      display: grid;
+      grid-template-columns: 20rem 8rem;
+      column-gap: 0.5rem;
+      row-gap: 1rem;
+    }
+
+    .span-two {
+      grid-column: span 2;
+      text-align: justify;
+    }
+
+    #createBtn {
+      width: 12rem;
+      padding: 4px 0;
+      margin: 1rem 0 0 0;
+      padding: 5px 0;
+      opacity: 0.8;
+    }
+
+    #createBtn {
+      margin-left: 2rem;
+    }
+
+    #createBtn:hover {
+      opacity: 1;
+    }
+
+    input[type='text'] {
+      width: 18rem;
+      height: 20px;
+      padding: 6px 0 8px 1rem;
+      outline: none;
+      font-size: 16px;
+      border: 1px solid gray;
+      outline: 1px solid transparent;
+      margin-top: 8px;
+      margin-bottom: 10px;
+    }
+
+    input[type='text']:focus {
+      outline: 1px solid gray;
+    }
+
+    .left-column label,
+    .left-column label:focus {
+      display: block;
+      width: 12rem;
+      cursor: pointer;
+    }
+
+    .field-list {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .right-column {
+      position: relative;
+      border: 1px solid gray;
+      border-radius: 5px;
+      margin-top: 1.45rem;
+      /* for ::before content */
+    }
+
+    .right-column::before {
+      content: 'Candidate Fields';
+      position: absolute;
+      top: -1.8rem;
+      left: 6px;
+    }
+
+    /* the bordered checkboxes block */
+    .bordered {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1rem 20rem;
+      column-gap: 0.5rem;
+      row-gap: 0.7rem;
+      align-items: center;
+      /* This centers items vertically in each row */
+      padding: 8px 1rem;
+      border: 1px solid gray;
+      border-radius: 6px;
+      width: 26.5rem;
+      margin-top: 3rem;
+    }
+
+    .bordered::before {
+      content: 'For the project include the following components';
+      position: absolute;
+      top: -1.8rem;
+      left: 1rem;
+    }
+
+    .checkbox-item {
+      display: contents;
+      /* Makes the grid container treat child elements as grid items */
+    }
+
+    .checkbox-item input[type='checkbox'] {
+      grid-column: 1;
+      justify-self: start;
+      align-self: center;
+      /* Explicitly center the checkbox vertically */
+      margin: 0;
+    }
+
+    .checkbox-item label {
+      grid-column: 2;
+      justify-self: start;
+      align-self: center;
+      /* Explicitly center the label vertically */
+      cursor: pointer;
+      line-height: 1;
+      /* Ensures consistent line height */
+    }
+
+    /* for CSS class names inserted as a markup string into innerHTML
+      class the names should be defined :global as they are in a new scope
+    */
+    :global(.list-el) {
+      position: relative;
+      background-color: skyblue;
+      height: 20px;
+      font-size: 18px;
+      line-height: 18px;
+      padding: 0 0 0 1rem;
+      margin: 6px 0 0 0;
+    }
+
+    :global(.list-el:hover) {
+      cursor: pointer;
+    }
+
+    :global(.list-el:hover)::before {
+      position: absolute;
+      top: -0.9rem;
+      left: 1rem;
+      z-index: 10;
+      font-size: 12px;
+      content: 'click to remove';
+      background-color: cornsilk;
+      padding: 1px 6px;
+      margin-right: 0.5rem;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Create CRUD Support</h2>
+  <div class="grid-wrapper">
+    <div class="span-two">
+      To create a UI Form for CRUD operations against the underlying ORM
+      specify its component name and create a field list by entering field
+      names in the Field Name pressing Enter. The +page.svelte with
+      accompanying +page.server.ts will be created in route specified in the
+      Route Name
+    </div>
+    <div class="left-column">
+      <label for="componentNameId">Component UI Form Name
+        <input id="componentNameId" type="text" />
+      </label>
+
+      <label for="routeNameId">Route Name
+        <input id="routeNameId" type="text" />
+      </label>
+      <label for="addFieldId">Field Name
+        <input id="addFieldId" type="text" />
+      </label>
+      <button id="createBtn">Create CRUD Support</button>
+    </div>
+    <div class="right-column">
+      <ul class="fields-list" id="fieldsList"></ul>
+    </div>
+  </div>
+  <div class="bordered">
+    <div class="checkbox-item">
+      <input id="cb1" type="checkbox" />
+      <label for="cb1">CRInput component</label>
+    </div>
+    <div class="checkbox-item">
+      <input id="cb2" type="checkbox" />
+      <label for="cb2">ButtonSpinner component</label>
+    </div>
+    <div class="checkbox-item">
+      <input id="cb3" type="checkbox" />
+      <label for="cb3">PageTitleCombo component</label>
+    </div>
+    <div class="checkbox-item">
+      <input id="cb4" type="checkbox" />
+      <label for="cb4">Tooltip component</label>
+    </div>
+    <div class="checkbox-item">
+      <input id="cb5" type="checkbox" />
+      <label for="cb5">Summary/Details component</label>
+    </div>
+  </div>
+  <script>
+    const vscode = acquireVsCodeApi()
+
+    let componentName = ''
+    let routeName = ''
+    let fields = []
+
+    const scroll = (el) => {
+      if (
+        el.offsetHeight + el.scrollTop >
+        el.getBoundingClientRect().height - 20
+      ) {
+        setTimeout(() => {
+          el.scrollTo(0, el.scrollHeight)
+        }, 0)
+      }
+    }
+
+    const componentNameEl = document.getElementById('componentNameId')
+    const routeNameEl = document.getElementById('routeNameId')
+    const addFieldEl = document.getElementById('addFieldId')
+
+    const fieldsListEl = document.getElementById('fieldsList')
+    const createBtnEl = document.getElementById('createBtn')
+
+    componentNameEl.addEventListener('input', e => componentName = e.target.value)
+    routeNameEl.addEventListener('input', e => routeName = e.target.value)
+
+    if (addFieldEl) {
+      console.log('getting  addFieldEl')
+      addFieldEl.addEventListener('keyup', (event) => {
+        console.log('keyup')
+        const v = addFieldEl.value.trim()
+        if (!v) {
+          console.log('field is empty')
+          return
+        }
+        if (fields.includes(v)) {
+          setTimeout(() => {
+            addFieldEl.style.color = 'red'
+          }, 0)
+          return
+        }
+        if (addFieldEl.style.color === 'red') {
+          addFieldEl.style.color = 'black'
+        }
+        if (event.key !== 'Enter') return
+        console.log('keyup Enter')
+        fields.push(v)
+        renderFields()
+        addFieldEl.value = ''
+        scroll(fieldsListEl)
+      })
+    }
+    function renderFields() {
+      console.log('renderFields called')
+      fieldsListEl.innerHTML = ''
+      fields.forEach(f => {
+        const p = document.createElement('li')
+        p.textContent = f
+        fieldsListEl.appendChild(p)
+      })
+    }
+
+    createBtnEl.addEventListener('click', () => {
+      if (componentName && routeName && fields.length) {
+        console.Logger('postMessage createCrudSupport')
+        // const payload = { componentName, routeName, fields };
+        // vscode.postMessage({ command: 'createCrudSupport', payload });
+      }
+    });
+  </script>
+</body>
+
+</html>

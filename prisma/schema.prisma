@@ -1,0 +1,168 @@
+// This is
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// NOTE: file renamed from .prisma to avoid prisma trying to save the file as forms db related
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id      			String   @id @default(uuid())
+  firstName    	String   @map("first_name")
+  lastName    	String   @map("last_name")
+  email   			String
+  passwordHash 	String   @map("password_hash")
+  userAuthToken	String   @unique @map("user_auth_token")
+
+  role          Role    @default(USER)
+  posts   			Post[]
+  profile 			Profile?
+
+  articles      Article[]
+  todos         Todo[]    // arrays are optional and could be empty
+
+  createdAt DateTime @default(now())   @map("created_at")
+  updatedAt DateTime? @updatedAt        @map("updated_at")
+
+	@@unique(name: "fullNameEmail", [firstName, lastName, email])
+  @@map("users")
+}
+
+
+enum Role {
+  USER
+  ADMIN
+}
+model Profile {
+  id     		String  @id @default(uuid())
+  bio    		String?
+
+  user   		User    @relation(fields: [userId], references: [id])
+  userId 		String  @unique    @map("user_id")
+
+  createdAt DateTime @default(now())   @map("created_at")
+  updatedAt DateTime? @updatedAt        @map("updated_at")
+
+  @@map("profile")
+}
+model Article {
+    id      	String @id @default(uuid())
+    title   	String
+    content 	String
+    author 	 	User 	 @relation(fields: [authorId], references: [id])
+    authorId 	String @map("author_id")
+
+    @@map("article")
+}
+
+model Post {
+  id        String 	 @id @default(uuid())
+  title     String   @db.VarChar(255)
+  content   String?
+  published Boolean  @default(false)
+
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String   @map("author_id")
+
+  categories Category[]
+
+  createdAt DateTime @default(now())   @map("created_at")
+  updatedAt DateTime? @updatedAt        @map("updated_at")
+
+  @@map("post")
+}
+
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String
+  posts Post[]
+
+  @@map("category")
+}
+model Todo {
+  id        String  @id @default(uuid())
+  title     String
+  content   String
+  priority  Int     @default(0)
+  completed Boolean @default(false)
+
+  user   		User    @relation(fields: [userId], references: [id])
+  userId 		String  @map("user_id")
+
+  createdAt DateTime @default(now())   @map("created_at")
+  updatedAt DateTime? @updatedAt        @map("updated_at")
+
+  @@map("todo")
+}
+
+
+// Use enums if database supports it
+// https://www.prisma.io/docs/reference/database-reference/database-features#misc
+
+// @@unique([firstName, lastname, email], name: fnlnemail) is ignored by Prisma
+// she created  "User__firstName_lastName_email_key"
+
+// db.findUnique({
+//   where: {
+//     User__firstName_lastName_email_key:{firstName, lastName, email}
+//   }
+// })
+
+// FOR prisma operations
+// const matches = await bcrypt.compare(password, user.passwordHash)
+// passwordHash: await bcrypt.hash(password, 10),
+// userAuthToken: crypto.randomUUID(),
+
+
+// psql -U postgres -d forms -U mili
+
+// ALTER SEQUENCE category_id_seq RESTART WITH 12;
+
+
+// CREATE ROLE mili SUPERUSER LOGIN PASSWORD "kiki";
+// GRANT ALL PRIVILEGES TO mili;
+
+// CREATE DATABASE FORMS OWNER mili;
+// GRANT ALL PRIVILEGES ON DATABASE forms TO mili;
+
+// \c forms mili
+// You are now connected to database "forms" as user "mili".
+
+// go to vsCode
+//  -- delete prisma node
+//  -- execute
+//  pnpx prisma init
+//  -- replace schema.prisma content with this file
+//  -- check .env file on user mili:kiki   DATABASE_URL="postgresql://mili:kiki@localhost:5432/forms?schema=public"
+//  -- execute
+//  pnpx prisma migrate dev --name init
+//  pnpx prisma generate
+//  -- insert into category
+
+// insert into category (name) values("JavaScript"),
+//  ("Typescript"),
+//  ("Svelte"),
+//  ("SvelteKit"),
+//  ("CSS"),
+//  ("SCSS"),
+//  ("Prisma ORM"),
+//  ("PostgreSQL"),
+//  ("GSAP"),
+//  ("Vite"),
+//  ("BCrypt"),
+//  ("Articles"),
+//  ("Comments"),
+//  ("Documents"),
+//  ("eMails"),
+//  ("Presentations"),
+//  ("Blogs"),
+//  ("Publications");
