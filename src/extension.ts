@@ -345,6 +345,10 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
     componentNameEl.addEventListener('input', (e) => {
       componentName = e.target.value
+      if (componentName.length > 0){
+        componentName = componentName[0].toUpperCase() + componentName.slice(1)
+        componentNameEl.value = componentName
+      }
       disableCreateButton()
     })
     routeNameEl.addEventListener('input', (e) => {
