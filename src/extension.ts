@@ -1,28 +1,179 @@
 import * as vscode from 'vscode';
-// import * as fs from 'fs/promises';
-import * as fsSync from 'fs';
+import * as fs from 'fs';
 import * as path from 'path';
+
+async function findPrismaSchemaRoot(): Promise<string | null> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders?.length) {
+    return null; // No workspace open
+  }
+
+  for (const folder of workspaceFolders) {
+    let currentPath = folder.uri.fsPath;
+
+    while (true) {
+      const prismaSchemaPath = path.join(currentPath, "prisma", "schema.prisma");
+
+      if (fs.existsSync(prismaSchemaPath)) {
+        return currentPath; // ✅ Found root containing prisma/schema.prisma
+      }
+
+      // Walk up to parent
+      const parentPath = path.dirname(currentPath);
+      if (parentPath === currentPath) {
+        break; // reached filesystem root, stop
+      }
+      currentPath = parentPath;
+    }
+  }
+    return null
+  }
+
+  function sortObjectKeys<T>(obj: Record<string, T>): Record<string, T> {
+    return Object.fromEntries(
+      /*
+        "base" ignores case and diacritics (so User, user, Úser, üser all sort together).
+        "accent" would keep diacritics (ú vs u) but ignore case.
+        "case" would respect case but ignore accents.
+        "variant" is the strictest (default) and respects everything.
+        numeric sorts asc f10, f2 as f2 f10 not as ascii f10 f2
+      */
+      Object.entries(obj).sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }))
+    );
+  }
+
+  // fieldInfo is a line following field names
+  type FieldInfo = {
+    type: string;
+    prismaSetting: string; // everything after the type
+  };
+
+  // every model/table has fieldName  and fieldInfo
+  type ModelInfo = {
+    fields: {
+      [fieldName: string]: FieldInfo;
+    };
+    modelAttributes: string[]; // e.g. ["@@map(\"users\")", "@@index([email])"]
+  };
+
+  // there are many models/tables in schema.prisma
+  type SchemaModels = {
+    [modelName: string]: ModelInfo;
+  };
+
+  function parsePrismaSchema(schemaContent: string): SchemaModels {
+    const models: SchemaModels = {};
+    const modelRegex = /model\s+(\w+)\s*{([^}]*)}/gms;
+
+    let modelMatch;
+    while ((modelMatch = modelRegex.exec(schemaContent)) !== null) {
+    const [, modelName, body] = modelMatch;
+    const fields: { [field: string]: FieldInfo } = {};
+    const modelAttributes: string[] = [];
+
+    // Remove block comments first
+    const bodyWithoutBlocks = body.replace(/\/\*[\s\S]*?\*\//g, "");
+
+    const lines = bodyWithoutBlocks
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      if (line.startsWith("//")) continue; // skip single-line comment
+
+      if (line.startsWith("@@")) {
+        modelAttributes.push(line);
+        continue;
+      }
+
+      const [fieldName, fieldType, ...rest] = line.split(/\s+/);
+      if (!fieldName || !fieldType) continue;
+
+      fields[fieldName] = {
+        type: fieldType,
+        prismaSetting: rest.join(" "),
+      };
+    }
+
+    models[modelName] = {
+      fields: sortObjectKeys(fields),
+      modelAttributes,
+    };
+  }
+
+  return models;
+}
+/*
+  JSON parser output
+    {
+      "Todo": {
+        "fields": {
+          "id": {
+            "type": "Int",
+            "prismaSetting": "@id @default(autoincrement())"
+          },
+          "title": {
+            "type": "String",
+            "prismaSetting": "@unique"
+          },
+          "createdAt": {
+            "type": "DateTime",
+            "prismaSetting": "@default(now())"
+          }
+        },
+        "modelAttributes": [
+          "@@map(\"todos\")"
+        ]
+      }
+    }
+*/
+
+function renderSchema(schemaModel: SchemaModels) {
+  const container = document.getElementById("schemaContainer");
+  if (container === null){
+    vscode.window.showErrorMessage('No HTML element with id="schema-container" is created in WebView')
+  }
+  // @ts-expect-error
+  container.innerHTML = ""; // clear
+
+  for (const [modelName, fields] of Object.entries(schemaModel)) {
+    const ul = document.createElement("ul");
+    ul.style.listStyleType = "none";
+    ul.style.paddingLeft = "0";
+
+    // model title
+    const modelLi = document.createElement("li");
+    modelLi.innerHTML = `<strong>${modelName}</strong>`;
+
+    const fieldsUl = document.createElement("ul");
+    fieldsUl.style.listStyleType = "none";
+    fieldsUl.style.paddingLeft = "1em";
+
+    for (const [fieldName, attrs] of Object.entries(fields)) {
+      const fieldLi = document.createElement("li");
+      fieldLi.textContent = `${fieldName} (${JSON.stringify(attrs)})`;
+      fieldsUl.appendChild(fieldLi);
+    }
+
+    modelLi.appendChild(fieldsUl);
+    ul.appendChild(modelLi);
+    // @ts-expect-error
+    container.appendChild(ul);
+  }
+}
+
 
 export function activate(context: vscode.ExtensionContext) {
   // Create output channel for webview logs
   const outputChannel = vscode.window.createOutputChannel('WebView Logs');
+
+  // register Create CRUD Support 
   const disposable = vscode.commands.registerCommand('cr-crud-extension.createCrudSupport', () => {
     
-    // const workspaceFolders = vscode.workspace.workspaceFolders;
-    // if (!workspaceFolders) {
-    //   vscode.window.showErrorMessage('No workspace folder open');
-    //   return;
-    // }
-    // Resolve path to ./prisma/schema.prisma
-    // const schemaPath = path.join(workspaceFolders[0].uri.fsPath, 'prisma', 'schema.prisma');
-    // try {
-    //   const schemaContent = fsSync.readFileSync(schemaPath, 'utf8');
-    //   vscode.window.showInformationMessage('Schema loaded successfully');
-    //   console.log(schemaContent); // Use or send to WebView
-    // } catch (err) {
-    //   vscode.window.showErrorMessage(`Failed to read schema.prisma: ${err}`);
-    // }
-
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    outputChannel.appendLine(`workspaceFolders', ${JSON.stringify(workspaceFolders,null,2)}`)
+    outputChannel.show(true);
 
     const panel = vscode.window.createWebviewPanel(
       'crCrudSupport',
@@ -34,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
     // const nonce = getNonce();
     panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
 
-    panel.webview.onDidReceiveMessage((msg) => {
+    panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.command === 'createCrudSupport') {
         const { componentName, routeName, fields, embellishments } = msg.payload as {
           componentName: string;
@@ -48,18 +199,48 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`[WebView] Received payload:', ${componentName}, ${routeName}, ${fields.join(', ')}, ${embellishments.join(', ')}`);
         outputChannel.show(true);
       }
-      else if (msg.command === 'readSchema') {
-        const schemaPath = path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, 'prisma', 'schema.prisma');
-        const content = fsSync.readFileSync(schemaPath, 'utf8');
-        panel.webview.postMessage({ command: 'schemaContent', content });
+      else if(msg.command==='readSchema'){
+        // outputChannel.appendLine(`[WebView] readSchema postMessage received', `);
+        // outputChannel.show(true);
+        try {
+          const rootPath = await findPrismaSchemaRoot();
+          if (!rootPath) {
+            vscode.window.showErrorMessage("Could not find schema.prisma in workspace or parent folders.");
+            return;
+          }
+
+          const prismaSchemaPath = path.join(rootPath, "prisma", "schema.prisma");
+          const schemaContent = fs.readFileSync(prismaSchemaPath, "utf-8");
+
+          const schemaModel = parsePrismaSchema(schemaContent);
+
+          // TODO: parse schemaContent and send back to WebView
+          // ---------------------- JSON parser schemaModel via command sendingSchemaModel  ----------------------
+          panel.webview.postMessage({
+            command: "sendingSchemaModel",
+            payload: schemaModel,
+          });
+          // vscode.window.showErrorMessage('This is a test vscode.window.showErrorMessage');
+        } catch (error) {
+          // vscode.window.showErrorMessage(panel.webview.postMessage({
+          //   command: "sendingSchemaModel",
+          //   payload: schemaModel,
+          // });
+          //   `Command failed: ${error instanceof Error ? error.message : String(error)}`
+          // );
+          vscode.window.showErrorMessage(
+            `Failed to read schema: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
       }
-      else if(msg.command==='log'){
-        vscode.window.showInformationMessage(`Bane command log ${msg.text}`);
-      // log should have at least a text property
-      // console.log(`[console.log] ${msg.text}`);
-      // Or log to output channel
-      outputChannel.appendLine(`[WebView log outputChannel msg] `);
-      outputChannel.show(true); // false = don't preserve focus
+      else if(msg.command === 'log'){
+        // vscode.window.showInformationMessage(`Bane command log ${msg.text}`);
+        vscode.window.showInformationMessage(`log ${msg.text}`);
+        // log should have at least a text property
+        // console.log(`[console.log] ${msg.text}`);
+        // Or log to output channel
+        outputChannel.appendLine(`[WebView log outputChannel ${msg.text}] `);
+        outputChannel.show(true); // false = don't preserve focus
       }
     });
   });
@@ -147,13 +328,6 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       margin-top: 1.45rem;
     }
 
-    /* .right-column::before {
-      content: 'Candidate Fields';
-      position: absolute;
-      top: -1.8rem;
-      left: 6px;
-    } */
-
     .bordered {
       position: relative;
       display: grid;
@@ -167,13 +341,6 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       width: 26.5rem;
       margin-top: 3rem;
     }
-
-    /* .bordered::before {
-      content: 'For the project include the following components';
-      position: absolute;
-      top: -1.8rem;
-      left: 1rem;
-    } */
 
     .checkbox-item {
       display: contents;
@@ -197,7 +364,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
     /* for CSS class names inserted as a markup string into innerHTML
       class the names should be defined :global as they are in a new scope
       but WebView CSP Restrictions: VS Code WebViews have strict CSP
-      and :: pseudo classes do not work, though they work in Svelte
+      and pseudo classes do not work, though they work in Svelte
     */
     :global(.list-el) {
       // background-color: skyblue;
@@ -263,9 +430,9 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       <button id="createBtnId" disabled>Create CRUD Support</button>
     </div>
     <div class='right-column'>
-
       <div class="fields-list" id="fieldsListId"></div>
-      <p id="removeHintId" class='remove-hint'>click to remove</p>
+        <p id="removeHintId" class='remove-hint'>click to remove</p>
+      </div>
     </div>
   </div>
   <div class="bordered">
@@ -295,15 +462,15 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
     vscode.postMessage({ command: 'log', text: 'Hello There!' })
 
     // Request schema
-    // vscode.postMessage({ command: 'readSchema' });
+    vscode.postMessage({ command: 'readSchema' });
 
-    // Receive schema
-    // window.addEventListener('message', event => {
-    //   const message = event.data;
-    //   if (message.command === 'schemaContent') {
-    //     console.log('Schema content:', message.content);
-    //   }
-    // });
+    // Receive schema from extension
+    window.addEventListener("message", event => {
+      const { type, schemaModel } = event.data;
+      // if (type === "schema") {
+        renderSchema(schemaModel);
+      // }
+    });
 
     // let vscode = {
     //   postMessage: ({ command, msg }) => (console.log(command, msg))
@@ -358,10 +525,10 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
     if (fieldNameEl) {
       fieldNameEl.addEventListener('keyup', (event) => {
-        vscode.postMessage({ command: 'log', text: 'fieldNameEl.addEventListener created' })
+        // vscode.postMessage({ command: 'log', text: 'fieldNameEl.addEventListener created' })
         const v = fieldNameEl.value.trim()
         if (!v) {
-          vscode.postMessage({ command: 'log', text: 'field is empty' })
+          // vscode.postMessage({ command: 'log', text: 'field is empty' })
           return
         }
         if (fields.includes(v)) {
