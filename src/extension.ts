@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
+
 async function findPrismaSchemaRoot(): Promise<string | null> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders?.length) {
@@ -129,7 +130,7 @@ async function findPrismaSchemaRoot(): Promise<string | null> {
     }
 */
 
-function renderSchema(schemaModel: SchemaModels) {
+function renderSchema(schemaModels: SchemaModels) {
   const container = document.getElementById("schemaContainer");
   if (container === null){
     vscode.window.showErrorMessage('No HTML element with id="schema-container" is created in WebView')
@@ -137,7 +138,7 @@ function renderSchema(schemaModel: SchemaModels) {
   // @ts-expect-error
   container.innerHTML = ""; // clear
 
-  for (const [modelName, fields] of Object.entries(schemaModel)) {
+  for (const [modelName, fields] of Object.entries(schemaModels)) {
     const ul = document.createElement("ul");
     ul.style.listStyleType = "none";
     ul.style.paddingLeft = "0";
@@ -165,8 +166,28 @@ function renderSchema(schemaModel: SchemaModels) {
 
 
 export function activate(context: vscode.ExtensionContext) {
+
   // Create output channel for webview logs
   const outputChannel = vscode.window.createOutputChannel('WebView Logs');
+
+  vscode.debug.onDidStartDebugSession(session => {
+    outputChannel.appendLine(`onDidStartDebugSession activated`);
+    outputChannel.show(true);
+    if (session.name === "Run Extension (with pak)") {
+      vscode.commands.executeCommand("cr-crud-extension.createCrudSupport");
+    }
+  });
+
+  context.subscriptions.push(
+    vscode.debug.onDidStartDebugSession(session => {
+      if (session.name === "Run Extension (with pak)") {
+        vscode.commands.executeCommand("cr-crud-extension.createCrudSupport")
+          .then(undefined, err => console.error("Failed to run CRUD support:", err));
+      }
+    })
+  );
+
+
 
   // register Create CRUD Support 
   const disposable = vscode.commands.registerCommand('cr-crud-extension.createCrudSupport', () => {
@@ -212,19 +233,19 @@ export function activate(context: vscode.ExtensionContext) {
           const prismaSchemaPath = path.join(rootPath, "prisma", "schema.prisma");
           const schemaContent = fs.readFileSync(prismaSchemaPath, "utf-8");
 
-          const schemaModel = parsePrismaSchema(schemaContent);
+          const schemaModels = parsePrismaSchema(schemaContent);
 
           // TODO: parse schemaContent and send back to WebView
-          // ---------------------- JSON parser schemaModel via command sendingSchemaModel  ----------------------
+          // ---------------------- JSON parser schemaModels via command sendingSchemaModel  ----------------------
           panel.webview.postMessage({
             command: "sendingSchemaModel",
-            payload: schemaModel,
+            payload: schemaModels,
           });
           // vscode.window.showErrorMessage('This is a test vscode.window.showErrorMessage');
         } catch (error) {
           // vscode.window.showErrorMessage(panel.webview.postMessage({
           //   command: "sendingSchemaModel",
-          //   payload: schemaModel,
+          //   payload: schemaModels,
           // });
           //   `Command failed: ${error instanceof Error ? error.message : String(error)}`
           // );
@@ -267,13 +288,13 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
   <style>
     .grid-wrapper {
       display: grid;
-      grid-template-columns: 20rem 8rem;
+      grid-template-columns: 20rem 8rem 16rem;
       column-gap: 0.5rem;
       row-gap: 1rem;
     }
 
-    .span-two {
-      grid-column: span 2;
+    .span-three {
+      grid-column: span 3;
       text-align: justify;
     }
 
@@ -321,7 +342,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       cursor: pointer;
     }
 
-    .right-column {
+    .middle-column {
       position: relative;
       border: 1px solid gray;
       border-radius: 5px;
@@ -403,6 +424,19 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
     .list-el:hover .remove-hint {
       opacity: 1;
     }
+    .third-column {
+      width: 16rem;
+      border: 1px solid gray;
+      border-radius: 6px;
+      padding: 6px 3px 8px 10px;
+    }
+    .model-list ul {
+      color: navy:
+    }
+    .model-list ul li {
+      color: yellow;
+    }
+    
   </style>
 
 </head>
@@ -410,7 +444,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 <body>
   <h2>Create CRUD Support</h2>
   <div class='grid-wrapper'>
-    <div class="span-two">
+    <div class="span-three">
       To create a UI Form for CRUD operations against the underlying ORM specify
       its component name and create a field list by entering field names in the
       Field Name pressing Enter. The +page.svelte with accompanying
@@ -429,9 +463,14 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       </label>
       <button id="createBtnId" disabled>Create CRUD Support</button>
     </div>
-    <div class='right-column'>
+    <div class='middle-column'>
       <div class="fields-list" id="fieldsListId"></div>
         <p id="removeHintId" class='remove-hint'>click to remove</p>
+      </div>
+    </div>
+    <div class='third-column'>
+      <div class="model-list" id="schemaContainer">
+        Third grid column waiting for the renderModel to sent prismaModel
       </div>
     </div>
   </div>
@@ -458,6 +497,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
     </div>
   </div>
   <script>
+    let tablesModel='waiting for schemaModels '
     const vscode = acquireVsCodeApi()
     vscode.postMessage({ command: 'log', text: 'Hello There!' })
 
@@ -466,9 +506,9 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
     // Receive schema from extension
     window.addEventListener("message", event => {
-      const { type, schemaModel } = event.data;
+      const { type, schemaModels } = event.data;
       // if (type === "schema") {
-        renderSchema(schemaModel);
+        renderSchema(schemaModels);
       // }
     });
 
