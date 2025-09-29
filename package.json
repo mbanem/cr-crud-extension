@@ -4,7 +4,7 @@
   "description": "A VS Code extension that opens a WebView to create CRUD support.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.77.0"
+    "vscode": "^1.1.37"
   },
   "categories": [
     "Other"
@@ -19,16 +19,19 @@
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
     "compile": "clear;tsc -p ./",
+    "build": "clear;tsc -p ./",
     "watch": "tsc -watch -p ./",
     "postinstall": "node ./node_modules/vscode/bin/install",
     "prepackage": "pnpm run compile",
     "package": "vsce package --no-dependencies",
-    "pak": "tsc -p ./; code --uninstall-extension mbanem.cr-crud-extension; rm /home/mili/TEST/cr-crud-extension/cr-crud-extension-0.0.1.vsix; vsce package --no-dependencies; VERSION=$(jq -r '.version' /home/mili/TEST/cr-crud-extension/package.json); code --install-extension /home/mili/TEST/cr-crud-extension/cr-crud-extension-${VERSION}.vsix;"
+    "remove": "code --uninstall-extension mbanem.cr-crud-extension; rm /home/mili/TEST/cr-crud-extension/cr-crud-extension-0.0.1.vsix;",
+    "pak": "tsc -p ./;  vsce package --no-dependencies; VERSION=$(jq -r '.version' /home/mili/TEST/cr-crud-extension/package.json); code --install-extension /home/mili/TEST/cr-crud-extension/cr-crud-extension-${VERSION}.vsix;"
   },
   "devDependencies": {
-    "@types/vscode": "^1.77.0",
+    "@types/vscode": "^1.1.37",
+    "@types/node": "24.5.2",
     "typescript": "^5.4.0",
-    "vscode": "^1.1.79"
+    "vscode": "^1.1.37"
   },
   "contributes": {
     "commands": [
@@ -39,7 +42,6 @@
     ]
   },
   "activationEvents": [
-    "onCommand:cr-crud-extension.createCrudSupport",
     "onDebug"
   ]
 }
