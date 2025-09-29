@@ -99,7 +99,6 @@
       top: -1.5rem;
       left: 0.5rem;
       display: inline-block;
-      color: navy;
     }
 
     .embellishments {
@@ -142,9 +141,9 @@
       but WebView CSP Restrictions: VS Code WebViews have strict CSP
       and pseudo classes do not work, though they work in Svelte
     */
-    .list-el {
-      background-color: skyblue;
-      width: max-100%;
+    :global(.list-el) {
+      // background-color: skyblue;
+      width: max-content;
       height: 20px;
       font-size: 18px;
       line-height: 18px;
@@ -152,7 +151,7 @@
       margin: 6px 0 0 0;
     }
 
-    .list-el:hover {
+    :global(.list-el:hover) {
       cursor: pointer;
     }
 
@@ -193,47 +192,6 @@
 
     .models-list ul li {
       color: yellow;
-    }
-
-    .model-name {
-      background-color: lightgray;
-      margin-top: 3px;
-      width: calc(100% -1rem);
-      border-radius: 6px;
-      padding-left: 1rem;
-      cursor: pointer;
-    }
-
-    .fields-column {
-      display: grid;
-      grid-template-columns: 7rem 7rem;
-      column-gap: 5px;
-      width: max-content;
-      padding: 6px 0 6px 1rem;
-      max-height: 10rem;
-      overflow-y: auto;
-      font-family: Georgia, 'Times New Roman', Times, serif;
-      font-size: 15px !important;
-      font-weight: 500 !important;
-    }
-
-    .fields-column p {
-      margin: 4px 0 0 0;
-      padding: 2px 0 0 4px 6pc;
-      border-bottom: 1px solid lightgray;
-      text-wrap: wrap;
-    }
-
-    .fields-column p:nth-child(odd) {
-      color: navy;
-      cursor: pointer;
-      width: 100%;
-      padding: 2px 0 2px 0.5rem;
-    }
-
-    .fields-column p:nth-child(even) {
-      font-weight: 400 !important;
-      font-size: 12px !important;
     }
   </style>
 
@@ -298,105 +256,49 @@
     <div class='right-column'>
       <span class='prisma-model-caption'>Select Fields from Prisma Model</span>
       <div id="schemaContainer">
-        <pre style='font-size:12px'>
-type FieldInfo = {
-  type: string;
-  prismaSetting: string; // everything after the type
-};
-
-// every model/table has fieldName and fieldInfo
-type ModelInfo = {
-  fields: {
-    [fieldName: string]: FieldInfo;
-  };
-  modelAttributes: string[]; // e.g. ["@@map(\"users\")", "@@index([email])"]
-};
-
-// there are many models/tables in schema.prisma
-type SchemaModels = {
-  [modelName: string]: ModelInfo;
-};
-        </pre>
+        Third grid column waiting for the renderModel to sent prismaModel
       </div>
     </div>
   </div>
 </div>
 </body>
 <script>
-  /*
-    type FieldInfo = {
-        type: string;
-        prismaSetting: string; // everything after the type
-      };
-  
-      // every model/table has fieldName  and fieldInfo
-      type ModelInfo = {
-        fields: {
-          [fieldName: string]: FieldInfo;
-        };
-        modelAttributes: string[]; // e.g. ["@@map(\"users\")", "@@index([email])"]
-      };
-  
-      // there are many models/tables in schema.prisma
-      type SchemaModels = {
-        [modelName: string]: ModelInfo;
-      };
-  */
   let tablesModel = 'waiting for schemaModels '
   // const vscode = acquireVsCodeApi()
-  function selectField(event) {
-    const el = event.target
-    const fieldName = el.innerText
-    if (el.style.color === 'navy' && !fields.includes(fieldName)) {
-      renderField(fieldName)
-    }
-  }
-  const enterEvent = new KeyboardEvent('keyup', {
-    key: 'Enter',
-    code: 'Enter',
-    keyCode: 13,
-    which: 13,
-    bubbles: true
-  })
+
   function renderParsedSchema(parsedSchemaModelsSchema) {
 
     const schemaModels = JSON.parse(parsedSchemaModelsSchema)
     let container = document.getElementById('schemaContainer')
-    let markup = ''
     try {
-      let markupFields = ''
-      for (const [modelName, theFields] of Object.entries(schemaModels)) {
-        for (const [fields, modelAttributes] of Object.entries(theFields)) {
-          let m = ''
-          for (const [fieldName, { type, prismaSetting }] of Object.entries(modelAttributes)) {
-            if ('0|1'.includes(fieldName)) continue
-            if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt')) {
-              m += `<p>\${fieldName}</p><p>type:${type} <span style='color:pink'>\${prismaSetting ?? 'na'}</span></p>`
-            } else {
-              m += `<p>${fieldName}</p><p>type:${type} ${prismaSetting ?? 'na'}</p>`
-            }
-          }
-          markupFields += m
+
+      for (const [modelName, fields] of Object.entries(schemaModels)) {
+        const ul = document.createElement("ul")
+        ul.style.listStyleType = "none"
+        ul.style.paddingLeft = "0"
+
+        // model title
+        const modelLi = document.createElement("li")
+        modelLi.innerHTML = `<strong>${modelName}</strong>`
+
+        const fieldsUl = document.createElement("ul")
+        fieldsUl.style.listStyleType = "none"
+        fieldsUl.style.paddingLeft = "1em"
+
+        for (const [fieldName, attrs] of Object.entries(fields)) {
+          const fieldLi = document.createElement("li")
+          fieldLi.textContent = `${fieldName} (${JSON.stringify(attrs)})`
+          fieldsUl.appendChild(fieldLi)
         }
-        markup += `<details>
-          <summary class='model-name'>${modelName}</summary>
-          <div class='fields-column'>${markupFields}</div>
-          </details>`
+
+        modelLi.appendChild(fieldsUl)
+        ul.appendChild(modelLi)
+        container.appendChild(ul)
       }
+      return container.innerHTML
     } catch (err) {
       console.log('renderSchema', err)
     }
-    container.innerHTML = markup
-    container.addEventListener('click', (event) => {
-      const el = event.target
-      const fieldName = el.innerText
-      if (el.tagName === 'P' && el.nextSibling.tagName === 'P' && !fields.includes(fieldName)) {
-        const savedEntry = fieldNameEl.value
-        fieldNameEl.value = fieldName
-        fieldNameEl.dispatchEvent(enterEvent)
-        fieldNameEl.value = savedEntry
-      }
-    })
   }
 
   // Request schema

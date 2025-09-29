@@ -4,10 +4,15 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "pak",
-      "type": "shell",
-      "command": "pnpm run pak", // or pnpm run pak
-      "problemMatcher": []
+      "type": "npm",
+      "script": "compile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "label": "pnpm: compile",
+      "detail": "clear; tsc -p ./",
+      "problemMatcher": ["$tsc"]
     }
   ]
 }

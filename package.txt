@@ -1,0 +1,10 @@
+Executing prepublish script 'npm run vscode:prepublish'...
+
+> cr-crud-extension@0.0.1 vscode:prepublish
+> pnpm run compile
+
+
+> cr-crud-extension@0.0.1 compile /home/mili/TEST/cr-crud-extension
+> clear;tsc -p ./
+
+[H[2J[3J DONE  Packaged: /home/mili/TEST/cr-crud-extension/cr-crud-extension-0.0.1.vsix (13 files, 1.64MB)
