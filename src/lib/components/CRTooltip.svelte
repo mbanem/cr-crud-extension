@@ -83,7 +83,6 @@ CRTooltip could accept the following props, though all are optional
     const m = getComputedStyle(node).transform.match(/scale(([0-9.]+))/);
     const scale = m ? Number(m[1]) : 1;
     const is = 1 - baseScale;
-    // console.log(translateX, translateY);
     // transform: translate uses matrix's last two entries for translate x and y
     // with scaleX=1 skewX=0 skewY=0  scaleY=1 (1-no scale and 0-no skew) just translate
     // NOTE: transform: translate is defined in the Tooltip.svelte and must specify
@@ -140,7 +139,6 @@ CRTooltip could accept the following props, though all are optional
     toolbarHeight = 0,
   }: TProps = $props();
 
-  // console.log('captionCSS', captionCSS);
   // Need to define variables as the setTooltipPos function adjusted them
   // to position properly based on preferredPos settings and available
   // space around the hovering elements
@@ -201,29 +199,13 @@ CRTooltip could accept the following props, though all are optional
     // NOTE: If your app has a Toolbar its height should be included in calculation.
     // For svelte-postgres app the toolbar height is 32px
 
-    // console.log('setTooltipPos called', hoveringElement);
     const { hoverRect, tooltipRect } = hoverRec[
       hoveringElement.id
     ] as HoverData;
     if (!hoverRect || !tooltipRect) {
-      // console.log('No rectangles found for the hovering element.');
       return;
     }
 
-    // console.log(
-    //   'hoverRect   runtime',
-    //   hoveringId,
-    //   hoverRec[hoveringId].hoverRect,
-    // );
-    // console.log(
-    //   'tooltipRect runtime',
-    //   '--id--',
-    //   hoverRec[hoveringId].tooltipRect,
-    // );
-    // Todo
-    // this screen has no toolbar so instead of 32px we set 0px,
-    // otherwise top position will require 32 more pixels for panel
-    // const toolbarHeight = 0; // 32;
     translateX = '';
 
     // is there enough space at the right side of the screen for width and for height
@@ -235,21 +217,6 @@ CRTooltip could accept the following props, though all are optional
 
     OK.top =
       hoverRect.top - window.scrollY - toolbarHeight > tooltipRect.height;
-    // console.log(
-    //   'hoverRect.top',
-    //   hoverRect.top,
-    //   'window.scrollY',
-    //   window.scrollY,
-    //   'toolbarHeight',
-    //   toolbarHeight,
-    //   'tooltipRect.height',
-    //   tooltipRect.height,
-    // );
-    // console.log(
-    //   hoverRect.top - window.scrollY - toolbarHeight,
-    //   '>',
-    //   tooltipRect.height,
-    // );
     OK.bottom =
       hoverRect.bottom - window.scrollY + tooltipRect.height <
       window.innerHeight;
@@ -257,20 +224,6 @@ CRTooltip could accept the following props, though all are optional
     OK.right =
       hoverRect.right - window.scrollX + tooltipRect.width < window.innerWidth;
 
-    // console.log(
-    //   'OK.top',
-    //   OK.top,
-    //   'OK.bottom',
-    //   OK.bottom,
-    //   'OK.left',
-    //   OK.left,
-    //   'OK.right',
-    //   OK.right,
-    //   'OK.leftRightBottom',
-    //   OK.leftRightBottom,
-    //   'OK.topBottomRight',
-    //   OK.topBottomRight,
-    // );
 
     for (let i = 0; i < getPreferred().length; i++) {
       const pref = getPreferred();
@@ -351,16 +304,7 @@ CRTooltip could accept the following props, though all are optional
             ttPanel.getBoundingClientRect() as DOMRect,
           );
 
-          // console.log(
-          //   'hoverRect   initial',
-          //   hoveringId,
-          //   hoverRec[hoveringId].hoverRect,
-          // );
-          // console.log(
-          //   'tooltipRect initial',
-          //   '--id--',
-          //   hoverRec[hoveringId].tooltipRect,
-          // );
+
         }
 
         // Clean up after logging

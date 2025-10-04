@@ -1,0 +1,12 @@
+<p>bio</p>
+<p>type:String? </p>
+<p>createdAt</p>
+<p>type:DateTime <span style='color:pink'>@default(now()) @map("created_at")</span></p>
+<p>id</p>
+<p>type:String <span style='color:pink'>@id @default(uuid())</span></p>
+<p>updatedAt</p>
+<p>type:DateTime? <span style='color:pink'>@updatedAt @map("updated_at")</span></p>
+<p>user</p>
+<p>type:User @relation(fields: [userId], references: [id])</p>
+<p>userId</p>
+<p>type:String <span style='color:pink'>@unique @map("user_id")</span></p>

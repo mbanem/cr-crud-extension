@@ -370,8 +370,8 @@ type SchemaModels = {
           let m = ''
           for (const [fieldName, { type, prismaSetting }] of Object.entries(modelAttributes)) {
             if ('0|1'.includes(fieldName)) continue
-            if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt')) {
-              m += `<p>\${fieldName}</p><p>type:${type} <span style='color:pink'>\${prismaSetting ?? 'na'}</span></p>`
+            if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt') || prismaSetting.includes('@unique')) {
+              m += `<p>${fieldName}</p><p>type:${type} <span style='color:pink'>${prismaSetting ?? 'na'}</span></p>`
             } else {
               m += `<p>${fieldName}</p><p>type:${type} ${prismaSetting ?? 'na'}</p>`
             }
