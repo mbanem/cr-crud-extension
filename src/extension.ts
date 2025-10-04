@@ -3,7 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 let rootPath: string | undefined;
+let routeName_ ='';
+let fields_:string[]=[];
+let embellishments_:string[]=[];
 function ensureComponentPath(){
+  console.log('embellishments_', embellishments_)
   try{
     const componentsPath = path.join(rootPath as string, '/src/lib/components');
     if (!fs.existsSync(componentsPath)) {
@@ -15,7 +19,209 @@ function ensureComponentPath(){
     return false;
   }
 }
-function createUtils(routeName:string, fields:string[]) {
+
+function noType(name: string){
+  return name.match(/([a-zA-z0-9_]+)\:?.*/)?.[1]
+}
+let buttons = `<div class='buttons'>
+  `;
+function buttons_(){
+  const spinner: boolean = embellishments_.includes('CRSpinner');
+  ['create', 'update', 'delete'].forEach((caption) => {
+    console.log('buttons_()', caption)
+    const cap = caption[0].toUpperCase() + caption.slice(1)
+    if(spinner){
+      buttons += `<CRSpinner
+        bind:this={btn${cap}}
+        spinOn={loading}
+        caption=${caption}
+        formaction="?/${caption}"
+        disabled={!formDataValid()}
+        hidden={false}
+      >
+      </CRSpinner>
+      `
+    }else{
+      buttons += `<button bind:this={btn${cap}} name="${caption}" formaction="?/${caption}">${caption}</button>
+      `
+    }
+      buttons + `</div>
+      `
+    })
+}
+
+function inputBox(fName:string){
+  const name = noType(fName)
+  if (embellishments_.includes('CRInput')){
+    return `<CRInput title="${name}"
+      exportValueOn="enter|blur"
+      capitalize={true}
+      bind:value={snap.${name}}
+      required={true}
+    >
+    </CRInput>
+    `
+  }
+  return `<input type="hidden" name="${name}" bind:value={snap.${name}} />
+  `
+}
+function submitFunc(){
+  return
+}
+function createFormPage(){
+  const pPagePath = path.join(rootPath as string, `/src/routes/${routeName_}`);
+  if (!fs.existsSync(pPagePath)) {
+    fs.mkdirSync(pPagePath, { recursive: true });
+  }
+    let TFormData = `type TFormData = {
+    id: String;
+    `
+  let inputBoxes = inputBox('Id')
+  
+  let data = `
+  let snap = $state<TFormData>({
+    id: '',
+    `
+  fields_.forEach(fName=>{
+    TFormData += `${fName};
+    `
+    data += `${noType(fName)}: '',
+    `
+    inputBoxes += inputBox(fName)
+  
+  })
+  let imports= ''
+  embellishments_.forEach(comp => {
+    imports += `import ${comp} from '$lib/components/${comp}.svelte';
+  `
+  })
+  let markup = `<script lang="ts">
+  import type { Snapshot } from '../$types';
+  import { onMount } from 'svelte';
+  import type { PageData, ActionData } from './$types';
+  import type { SubmitFunction } from '@sveltejs/kit';
+  import { enhance } from '$app/forms';
+  import { invalidateAll } from '$app/navigation';
+  import { page } from '$app/state'; // for page.status code on actions
+
+  import * as utils from '$lib/utils';
+  ` + imports + TFormData + `}` + data + `});
+
+  type ARGS = {
+    data: PageData;
+    form: ActionData;
+  };
+  let { data, form }: ARGS = $props();
+  let loading = $state<boolean>(false); // toggling the spinner
+  let btnCreate: HTMLButtonElement;
+  let btnUpdate: HTMLButtonElement;
+  let btnDelete: HTMLButtonElement;
+  let iconDelete: HTMLSpanElement;
+
+  const clearMessage = () => {
+    setTimeout(() => {
+      result = '';
+    }, 2000);
+  };
+
+  const capitalize = (str:string) => {
+    const spaceUpper = (su:string) => {
+      return \` \${su[1]?.toUpperCase()}\`
+    }
+    
+    return str
+    .replace(/(_\\w)/, spaceUpper)
+    .replace(/\\b[a-z](?=[a-z]{2})/g, (char) => char.toUpperCase())
+  }
+
+  const routeName = capitalize(document.getElementById('routeNameId').value);
+
+  function noType(name: string){
+    return name.match(/([a-zA-z0-9_]+)\:?.*/)?.[1]
+  }
+
+  let formDataValid = $derived.by(() => {
+    fields.forEach(fName => {
+      const name = noType(fName);
+      if (!snap[name]){
+        return false;
+      }
+    })
+    return true;
+  });
+
+  const clearForm = (event?: MouseEvent | KeyboardEvent) => {
+    event?.preventDefault();
+    fields.forEach(fName => {
+      const name = noType(fName);
+      snap[name] = ''
+    });
+    utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
+  };` + `
+  
+  const enhanceSubmit: SubmitFunction = async ({ action, formData }) => {
+    const required:string[] = [];
+    fields.forEach(fName => {
+      const name = noType(fName)
+      if(!formData.get(name)){
+        const req = ' -- '+ name +' is required';
+        const el = document.querySelector('[title="' + name +'"]')
+        if (el){
+          (el as HTMLInputElement).placeholder += req;
+          required.push(req.slice(4))
+        }
+      }
+    })
+    if (required.join('').length){
+      return;
+    }
+    // form is valid 
+    loading = true; // start spinner animation
+
+    result =
+      action.search === '?/create'
+        ? 'creating \`\${routeName}\`...'
+        : action.search === '?/update'
+          ? 'updating \`\${routeName}\`...'
+          : 'deleting \`\${routeName}\`...';
+    if (action.search === '?/delete') {
+      hideButtonsExceptFirst([btnDelete, btnCreate, btnUpdate]);
+    }
+
+    return async ({ update }) => {
+      await update();
+
+      if (action.search === '?/create') {
+        result = page.status === 200 ? '\`\${routeName}\` created' : 'create failed';
+      } else if (action.search === '?/update') {
+        result = page.status === 200 ? '\`\${routeName}\` updated' : 'update failed';
+      } else if (action.search === '?/delete') {
+        result = page.status === 200 ? '\`\${routeName}\` deleted' : 'delete failed';
+        iconDelete.classList.toggle('hidden');
+        hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
+      }
+      invalidateAll();
+      await utils.sleep(1000);
+      loading = false; // stop spinner animation
+      clearForm();
+      hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
+      clearMessage();
+
+
+  ${buttons_()}
+  </script>
+  <form action="?/create" method="post" use:enhance={enhanceSubmit}>
+    <div class="buttons">
+    ${inputBoxes}
+    ${buttons}<button onclick={clearForm}>clear form</button>
+    </div>
+  </form>
+  `
+  const filePath = path.join(pPagePath as string, '+page.svelte');
+  fs.writeFileSync(filePath, markup, 'utf8');
+}
+function createUtils(routeName:String, fields:string[]) {
+
   const utils = `export const sleep = async (ms: number) => {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -51,8 +257,12 @@ function createUtils(routeName:string, fields:string[]) {
   if (!fs.existsSync(utilsPath)) {
     fs.mkdirSync(utilsPath, { recursive: true });
   }
-  const filePath = path.join(utilsPath, 'crHelpers.ts')
+  let filePath = path.join(utilsPath, 'crHelpers.ts')
   fs.writeFileSync(filePath, utils, 'utf8');
+
+  const content = "export * from '/home/mili/TEST/cr-crud-extension/src/lib/utils/crHelpers';";
+  filePath = path.join(utilsPath, 'index.ts')
+  fs.writeFileSync(filePath, content, 'utf8');
 }
 
 function createCRInput(){
@@ -322,21 +532,21 @@ function createCRSpinner(){
   if (!componentsPath) return
   const crSpinner = `<!--
 @component
-	ButtonSpinner wraps an HTMLButtonElement named button, so it could be bound to a parent variable say
+	CRSpinner wraps an HTMLButtonElement named button, so it could be bound to a parent variable say
     let btnCreate:HTMLButtonElement
-  <ButtonSpinner bind:button={btnCreate} ...><ButtonSpinner>
+  <CRSpinner bind:button={btnCreate} ...><CRSpinner>
   and it is the only way to get reference to the embedded button.
-  There is no way for now to get reference via document.querySelector('ButtonSpinner')
-  or document.getElementsByTagName('ButtonSpinner')[0]
+  There is no way for now to get reference via document.querySelector('CRSpinner')
+  or document.getElementsByTagName('CRSpinner')[0]
 
-	ButtonSpinner component features a 3/4 circle skyblue spinner. In order to start and stop spinning its spinOn
+	CRSpinner component features a 3/4 circle skyblue spinner. In order to start and stop spinning its spinOn
 	property should be bound to a parent boolean variable, e.g. let loading:boolean = false (not a $state rune)
 	Spin starts when loading is set to true and stops when it is false
 	Mandatory props are 
 		- caption     -- a button title
     - spinOn      -- boolean controlling spin on/off  with loading true/false
-    - button      -- a parent variable bound to internal ButtonSpinner button via parent code like
-										import ButtonSpinner from '$lib/components/ButtonSpinner.svelte'
+    - button      -- a parent variable bound to internal CRSpinner button via parent code like
+										import CRSpinner from '$lib/components/CRSpinner.svelte'
 										let btnCreate:HTMLButtonElement
 										let cursor:boolean           -- true set it to 'pointer', false to 'not allowed'
 										let loading:boolean = false  -- keep spinner idle until loading = true
@@ -349,7 +559,7 @@ function createCRSpinner(){
 										export const actions: Actions = {
 										createTodo: async ({ request }) => { ...
 										Property cursor is optional and is used to warn user for action not allowed
-										<ButtonSpinner 
+										<CRSpinner 
 												bind:button={btnCreate} 
 												caption='Create Todo' 
 												spinOn={loading}
@@ -364,12 +574,12 @@ function createCRSpinner(){
 												spinnerSize='1.3rem'	/* spinner circle diameter, default is 1em but could be different */
 											  duration='3s'     		/* duration in seconds for one RPM, default is 1.5s */
 										>
-										</ButtonSpinner>
+										</CRSpinner>
 -->
 <script lang="ts">
-  export type TButtonSpinner = HTMLButtonElement & ButtonSpinner;
+  export type TButtonSpinner = HTMLButtonElement & CRSpinner;
 
-  type ButtonSpinner = {
+  type TProps = {
     caption: string;
     button: HTMLButtonElement;
     spinOn: boolean;
@@ -398,7 +608,7 @@ function createCRSpinner(){
     top = \`0\`,
     width = 'max-content',
     height = '2rem',
-  }: ButtonSpinner = $props();
+  }: TProps = $props();
 </script>
 
 {#snippet spinner(color: string)}
@@ -672,7 +882,6 @@ CRTooltip could accept the following props, though all are optional
     const m = getComputedStyle(node).transform.match(/scale\(([0-9.]+)\)/);
     const scale = m ? Number(m[1]) : 1;
     const is = 1 - baseScale;
-    // console.log(translateX, translateY);
     // transform: translate uses matrix's last two entries for translate x and y
     // with scaleX=1 skewX=0 skewY=0  scaleY=1 (1-no scale and 0-no skew) just translate
     // NOTE: transform: translate is defined in the Tooltip.svelte and must specify
@@ -729,7 +938,6 @@ CRTooltip could accept the following props, though all are optional
     toolbarHeight = 0,
   }: TProps = $props();
 
-  // console.log('captionCSS', captionCSS);
   // Need to define variables as the setTooltipPos function adjusted them
   // to position properly based on preferredPos settings and available
   // space around the hovering elements
@@ -790,29 +998,13 @@ CRTooltip could accept the following props, though all are optional
     // NOTE: If your app has a Toolbar its height should be included in calculation.
     // For svelte-postgres app the toolbar height is 32px
 
-    // console.log('setTooltipPos called', hoveringElement);
     const { hoverRect, tooltipRect } = hoverRec[
       hoveringElement.id
     ] as HoverData;
     if (!hoverRect || !tooltipRect) {
-      // console.log('No rectangles found for the hovering element.');
       return;
     }
 
-    // console.log(
-    //   'hoverRect   runtime',
-    //   hoveringId,
-    //   hoverRec[hoveringId].hoverRect,
-    // );
-    // console.log(
-    //   'tooltipRect runtime',
-    //   '--id--',
-    //   hoverRec[hoveringId].tooltipRect,
-    // );
-    // Todo
-    // this screen has no toolbar so instead of 32px we set 0px,
-    // otherwise top position will require 32 more pixels for panel
-    // const toolbarHeight = 0; // 32;
     translateX = '';
 
     // is there enough space at the right side of the screen for width and for height
@@ -824,21 +1016,6 @@ CRTooltip could accept the following props, though all are optional
 
     OK.top =
       hoverRect.top - window.scrollY - toolbarHeight > tooltipRect.height;
-    // console.log(
-    //   'hoverRect.top',
-    //   hoverRect.top,
-    //   'window.scrollY',
-    //   window.scrollY,
-    //   'toolbarHeight',
-    //   toolbarHeight,
-    //   'tooltipRect.height',
-    //   tooltipRect.height,
-    // );
-    // console.log(
-    //   hoverRect.top - window.scrollY - toolbarHeight,
-    //   '>',
-    //   tooltipRect.height,
-    // );
     OK.bottom =
       hoverRect.bottom - window.scrollY + tooltipRect.height <
       window.innerHeight;
@@ -846,20 +1023,6 @@ CRTooltip could accept the following props, though all are optional
     OK.right =
       hoverRect.right - window.scrollX + tooltipRect.width < window.innerWidth;
 
-    // console.log(
-    //   'OK.top',
-    //   OK.top,
-    //   'OK.bottom',
-    //   OK.bottom,
-    //   'OK.left',
-    //   OK.left,
-    //   'OK.right',
-    //   OK.right,
-    //   'OK.leftRightBottom',
-    //   OK.leftRightBottom,
-    //   'OK.topBottomRight',
-    //   OK.topBottomRight,
-    // );
 
     for (let i = 0; i < getPreferred().length; i++) {
       const pref = getPreferred();
@@ -940,16 +1103,7 @@ CRTooltip could accept the following props, though all are optional
             ttPanel.getBoundingClientRect() as DOMRect,
           );
 
-          // console.log(
-          //   'hoverRect   initial',
-          //   hoveringId,
-          //   hoverRec[hoveringId].hoverRect,
-          // );
-          // console.log(
-          //   'tooltipRect initial',
-          //   '--id--',
-          //   hoverRec[hoveringId].tooltipRect,
-          // );
+
         }
 
         // Clean up after logging
@@ -1254,7 +1408,7 @@ async function findPrismaSchemaRoot(): Promise<string | null> {
       modelAttributes,
     };
   }
-
+  
   return models;
 }
 
@@ -1349,8 +1503,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       }
       else if (msg.command === 'createCrudSupport') {
-        const { componentName, routeName, fields, embellishments } = msg.payload as {
-          componentName: string;
+        const {routeName, fields, embellishments } = msg.payload as {
           routeName: string;
           fields: string[];
           embellishments:string[];
@@ -1358,7 +1511,10 @@ export async function activate(context: vscode.ExtensionContext) {
         type FuncList = {
           [funcName: string]: Function;
         };
-        // createUtils(routeName, fields);
+        routeName_ = routeName;
+        fields_= fields;
+        embellishments_ = embellishments;
+        createUtils(routeName, fields);
         const funcList: FuncList = {
           'CRInput': createCRInput,
           'CRSpinner':createCRSpinner,
@@ -1371,6 +1527,8 @@ export async function activate(context: vscode.ExtensionContext) {
             funcList[fun]()
           }finally{}
         }
+        createFormPage();
+        buttons_();
         // if  (embellishments.includes('CRInput')){
         //   createCRInput();
         // }
@@ -1380,14 +1538,13 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`[WebView] createCrudSupport command entry point`);
         outputChannel.show(false);
         // Empty body for now
-        outputChannel.appendLine(`[WebView] Received payload:', ${componentName}, ${routeName}, ${fields.join(', ')}, ${embellishments.join(', ')}`);
+        outputChannel.appendLine(`[WebView] Received payload:', ${routeName}, ${fields.join(', ')}, ${embellishments.join(', ')}`);
         outputChannel.show(true);
       }
       else if(msg.command === 'log'){
         // vscode.window.showInformationMessage(`Bane command log ${msg.text}`);
         vscode.window.showInformationMessage(`log ${msg.text}`);
         // log should have at least a text property
-        // console.log(`[console.log] ${msg.text}`);
         // Or log to output channel
         outputChannel.appendLine(`[WebView log outputChannel ${msg.text}] `);
         outputChannel.show(true); // false = don't preserve focus
@@ -1417,19 +1574,22 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
   <style>
     .main-grid {
       display: grid;
-      grid-template-columns: 29rem 17rem;
+      grid-template-columns: 33rem 20rem;
     }
 
     .grid-wrapper {
       display: grid;
-      grid-template-columns: 20rem 8rem;
+      grid-template-columns: 20rem 12rem;
       column-gap: 0.5rem;
       row-gap: 1rem;
     }
 
+    
     .span-two {
       grid-column: 1 / span 2;
       text-align: justify;
+      font-size: 12px;
+      color: skyblue;
     }
 
 
@@ -1504,6 +1664,12 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       border-radius: 6px;
       padding: 6px 3px 8px 10px;
       margin-top: 1.5rem;
+
+    }
+
+    #schemaContainer {
+      height: 30rem;
+      overflow-y: auto;
     }
 
     .right-column .prisma-model-caption {
@@ -1521,13 +1687,13 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       grid-template-columns: 1rem 20rem;
 
       column-gap: 0.5rem;
-      row-gap: 0.7rem;
+      row-gap: 0.1rem;
       align-items: center;
       padding: 8px 1rem;
       border: 1px solid gray;
       border-radius: 6px;
-      width: 26.5rem;
       margin-top: 3rem;
+      user-select: none;
     }
 
     .checkbox-item {
@@ -1547,6 +1713,13 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       align-self: center;
       cursor: pointer;
       line-height: 1;
+      width: 25rem !important;
+    }
+
+    .checkbox-item label:hover {
+      background-color: cornsilk;
+      cursor: pointer;
+      width: 25rem !important;
     }
 
     /* for CSS class names inserted as a markup string into innerHTML
@@ -1576,7 +1749,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
     .remove-hint {
       position: absolute;
-      left: 1rem !important;
+      left: 1.5rem !important;
       z-index: 10;
       font-size: 12px;
       color: red;
@@ -1600,7 +1773,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
     }
 
     .models-list ul {
-      color: navy;
+      color: skyblue;
     }
 
     .models-list ul li {
@@ -1608,23 +1781,22 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
     }
 
     .model-name {
-      color: skyblue;;
-      border-bottom: 1px solid lightgray;
+      color: #3e3e3e;
+      background-color: #e3e3e3;
       margin-top: 3px;
       width: calc(100% -1rem);
-      // border-radius: 6px;
+      border-radius: 6px;
       padding-left: 1rem;
       cursor: pointer;
     }
 
     .fields-column {
       display: grid;
-      grid-template-columns: 7rem 7rem;
+      grid-template-columns: 7rem 9.5rem;
       column-gap: 5px;
       width: max-content;
       padding: 6px 0 6px 1rem;
-      max-height: 10rem;
-      overflow-y: auto;
+      height:auto;
       font-family: Georgia, 'Times New Roman', Times, serif;
       font-size: 15px !important;
       font-weight: 500 !important;
@@ -1635,18 +1807,16 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       padding: 2px 0 0 4px 6pc;
       border-bottom: 1px solid lightgray;
       text-wrap: wrap;
-      }
-      
-      .fields-column p:nth-child(odd) {
-        color: skyblue;
-        // color: navy;
-        cursor: pointer;
-        width: 100%;
-        padding: 2px 0 2px 0.5rem;
-      }
+    }
+
+    .fields-column p:nth-child(odd) {
+      color: skyblue;
+      cursor: pointer;
+      width: 100%;
+      padding: 2px 0 2px 0.5rem;
+    }
 
     .fields-column p:nth-child(even) {
-      color: lightgreen;
       font-weight: 400 !important;
       font-size: 12px !important;
     }
@@ -1659,23 +1829,21 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
   <div class='main-grid'>
     <div class='grid-wrapper'>
-      <div class="span-two">
-        To create a UI Form for CRUD operations against the underlying ORM specify
-        its component name and create a field list by entering field names in the
-        Field Name pressing Enter. The +page.svelte with accompanying
-        +page.server.ts will be created in route specified in the Route Name
-      </div>
+      <pre class="span-two">
+To create a UI Form for CRUD operations against the underlying ORM fill
+out the <i>Candidate Fields</i> by entering field names in the <i>Field Name</i> input
+box with its datatype, e.g. firstName: string,  and pressing the Enter key
+or expand a table from the <i>Select Fields from ORM</i> block and click on
+a field name avoiding the auto-generating fields usually colored in pink.
+The UI Form +page.svelte with accompanying +page.server.ts will be 
+created in the route specified in the Route Name input box.
+      </pre>
 
       <div class='left-column'>
-        <label for="componentNameId">Component UI Form Name
-          <input id="componentNameId" type="text" />
-        </label>
-
         <label for="routeNameId">Route Name
           <input id="routeNameId" type="text" />
         </label>
-        <label for="fieldNameId">Field Name
-          <input id="fieldNameId" type="text" value='password' />
+        <input id="fieldNameId" type="text" value='password: string' />
         </label>
         <button id="createBtnId" disabled>Create CRUD Support</button>
       </div>
@@ -1694,11 +1862,11 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
         </div>
         <div class="checkbox-item">
           <input id="CRSpinner" type="checkbox" />
-          <label for="CRSpinner">ButtonSpinner component</label>
+          <label for="CRSpinner">CRSpinner component</label>
         </div>
         <div class="checkbox-item">
           <input id="CRActivity" type="checkbox" />
-          <label for="CRActivity">PageTitleCombo component</label>
+          <label for="CRActivity">CRActivity component</label>
         </div>
         <div class="checkbox-item">
           <input id="CRTooltip" type="checkbox" />
@@ -1711,7 +1879,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       </div>
     </div>
     <div class='right-column'>
-      <span class='prisma-model-caption'>Select Fields from Prisma Model</span>
+      <span class='prisma-model-caption'>Select Fields from ORM</span>
       <div id="schemaContainer">
       </div>
     </div>
@@ -1721,35 +1889,37 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 <script>
   /*
     type FieldInfo = {
-        type: string;
-        prismaSetting: string; // everything after the type
+      type: string;
+      prismaSetting: string; // everything after the type
+    };
+
+    // every model/table has fieldName  and fieldInfo
+    type ModelInfo = {
+      fields: {
+        [fieldName: string]: FieldInfo;
       };
-  
-      // every model/table has fieldName  and fieldInfo
-      type ModelInfo = {
-        fields: {
-          [fieldName: string]: FieldInfo;
-        };
-        modelAttributes: string[]; // e.g. ["@@map(\"users\")", "@@index([email])"]
-      };
-  
-      // there are many models/tables in schema.prisma
-      type SchemaModels = {
-        [modelName: string]: ModelInfo;
-      };
+      modelAttributes: string[]; // e.g. ["@@map(\"users\")", "@@index([email])"]
+    };
+
+    // there are many models/tables in schema.prisma
+    type SchemaModels = {
+      [modelName: string]: ModelInfo;
+    };
   */
   let tablesModel = 'waiting for schemaModels '
   const vscode = acquireVsCodeApi()
 
+  // user clicks on fields list and it should click on a field name
+  // rendered in skyblue
   function selectField(event) {
     const el = event.target
     const fieldName = el.innerText
-    if (el.style.color === 'navy' && !fields.includes(fieldName)) {
+    if (el.style.color === 'skyblue' && !fields.includes(fieldName)) {
       renderField(fieldName)
     }
   }
-
-  const enterEvent = new KeyboardEvent('keyup', {
+  // to send to an input box the Enter key up we need an event to dispatch
+  const enterKeyEvent = new KeyboardEvent('keyup', {
     key: 'Enter',
     code: 'Enter',
     keyCode: 13,
@@ -1757,75 +1927,100 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
     bubbles: true
   })
 
-  function renderParsedSchema(parsedSchemaModelsSchema) {
-    console.log('renderParsedSchema entry point')
-    const schemaModels = parsedSchemaModelsSchema;
+  // a parsed schema from a Prisma ORM is sent back from the extension
+  // and as it is an HTML collection we turn it into an Object with
+  // entries to be destructed into individual object properties
+  function renderParsedSchema(schemaModels) {
+
+    // get container to render the schema into
     let container = document.getElementById('schemaContainer')
     let markup = ''
     try {
-      let markupFields = ''
       for (const [modelName, theFields] of Object.entries(schemaModels)) {
-        for (const [fields, modelAttributes] of Object.entries(theFields)) {
-          let m = ''
-          for (const [fieldName, { type, prismaSetting }] of Object.entries(modelAttributes)) {
-            if ('0|1'.includes(fieldName)) continue
-            if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt')) {
-              m += \`<p>\${fieldName}</p><p>type:\${type} <span style='color:pink'>\${prismaSetting ?? 'na'}</span></p>\`
-            }else{
-              m += \`<p>\${fieldName}</p><p>type:\${type} \${prismaSetting ?? 'na'}</p>\`
-            }
+        const [, fields] = Object.entries(theFields)[0]
+        let m = ''
+        for (const [fieldName, { type, prismaSetting }] of Object.entries(fields)) {
+          if ('0|1'.includes(fieldName)) continue
+          if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt') || prismaSetting.includes('@unique')) {
+            m += \`<p>\${fieldName}</p><p>type:\${type} <span style='color:pink'>\${prismaSetting ?? 'na'}</span></p>\`
+          } else {
+            m += \`<p>\${fieldName}</p><p>type:\${type} \${prismaSetting ?? 'na'}</p>\`
           }
-          markupFields += m
         }
+        // render field name as a collapsed summary to reveal field list when expanded
         markup += \`<details>
           <summary class='model-name'>\${modelName}</summary>
-          <div class='fields-column'>\${markupFields}</div>
+          <div class='fields-column'>\${m}</div>
           </details>\`
       }
     } catch (err) {
-      console.log('renderSchema', err)
+      console.log('renderParsedSchema', err)
     }
+    // now all the markup constructed as a string render into  container
     container.innerHTML = markup
+
+    // container gets click event but it has to be from the first <p> element
+    // and that fieldname (innerText) id ignored if already saved in the fields
     container.addEventListener('click', (event) => {
+
+      if (event.target.tagName === 'SUMMARY'){
+        routeNameEl.value = event.target.innerText.toLowerCase();
+        routeNameEl.focus();
+        routeNameEl.click()
+        return;
+      }
       const el = event.target
       const fieldName = el.innerText
+      // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
+      let type = el.nextSibling.innerText.match(/type:(\\S+)/)?.[1];
+      if (type === 'DateTime'){
+        type = 'Date';
+      }
+      // the standard procedure for entering a new fieldname is via input box + Enter
       if (el.tagName === 'P' && el.nextSibling.tagName === 'P' && !fields.includes(fieldName)) {
+        // we need input box so preserve its entry if any and restore after
         const savedEntry = fieldNameEl.value
-        fieldNameEl.value = fieldName
-        fieldNameEl.dispatchEvent(enterEvent)
+        fieldNameEl.value = \`\${fieldName}: \${type}\`
+        fieldNameEl.dispatchEvent(enterKeyEvent)
         fieldNameEl.value = savedEntry
       }
     })
   }
 
-  // Request schema
+  // Request schema from the active extension
   vscode.postMessage({ command: 'readSchema' })
 
-  // Receive schema from extension
+  // Receive schema from the extension
   window.addEventListener("message", event => {
-    const message = event.data;
-    console.log('WebView called from Extension')
-    if (message.command === 'renderSchema') {
-      console.log('WebView is calling renderParsedSchema')
-      renderParsedSchema(message.payload)
+    // vscode.postMessage({ command: 'log', text: 'got payload for renderParsedSchema()' })
+    const msg = event.data;
+    if (msg.command === 'renderSchema') {
+      renderParsedSchema(msg.payload)
     }
   })
+  
+  // FieldsList elements use inline style for high specificity as they are created dynamically 
+  // by inserting innerHTML, so the inline style is in the listElCSS variable
+  const listElCSS = 'color:black; font-size:14px; font-weight: 400; background-color: skyblue; margin: 2px 0 0 0;'
 
-
-  // FieldsList elements inline style as they are crated dynamically via innerHTML
-  const listElCSS = 'color:black; font-weight: 500; background-color: skyblue; margin: 2px 0 0 0;'
-  let componentName = ''
   let routeName = ''
-  // its data-filed-index and read via el.getAttribute('data-field-index')
-  // or using camel case variable name replacing 'data-' with .dataset. property
-  // el.dataset.fieldIndex where -i in capitalized just Index
+  // its data-filed-index are read via el.getAttribute('data-field-index')
+  // or using camel case property name replacing 'data-' with .dataset
+  // el.dataset.fieldIndex where data-field-index turn to .dataset.fieldIndex 
+
   let fields = []
+  // for removing element from the fields list every fieldName is given short id
+  // as data-field-index HTML attribute and received on click event and read
   const getUniqueId = () => {
     // convert to a string of an integer from base 36
     return Math.random().toString(36).slice(2)
   }
+
   const removeHintEl = document.getElementById('removeHintId')
-  removeHintEl.style.opacity = '0'
+  removeHintEl.style.opacity = '0'    // make it as a hidden tooltip
+
+  // when a fieldList container is full scroll it so the last element
+  // is exposed visible
   const scroll = (el) => {
     if (
       el.offsetHeight + el.scrollTop >
@@ -1836,37 +2031,49 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       }, 0)
     }
   }
+  
+  // create button should be enabled when fields list is not empty
+  // and the route name is specified
   const disableCreateButton = () => {
-    createBtnEl.disabled = !fields.length || !routeName || !componentName
+    createBtnEl.disabled = !fields.length || !routeName
   }
-  const componentNameEl = document.getElementById('componentNameId')
+
+  function adjustFiledNameAndType(val){
+    val = val.replace(/\\s+/g,'')
+
+    if (!val.match(/\\s*[a-zA-z0-9_]+\\s*\\:\\s*([a-zA-z0-9_]+)/)?.[1]){
+      val = val.replace(/\\:.*\$/,'') + ': string'
+    }else{
+      val = val.replace(/([a-zA-z0-9_]+)\:([a-zA-z0-9_]+)/, '\$1: \$2')
+    }
+    return val
+  }
+
+  // the two input boxes for route name and fieldName, which is
+  // used repeatedly for making Candidate Fields
   const routeNameEl = document.getElementById('routeNameId')
   const fieldNameEl = document.getElementById('fieldNameId')
 
   const fieldsListEl = document.getElementById('fieldsListId')
   const createBtnEl = document.getElementById('createBtnId')
 
-  componentNameEl.addEventListener('input', (e) => {
-    componentName = e.target.value
-    if (componentName.length > 0) {
-      componentName = componentName[0].toUpperCase() + componentName.slice(1)
-      componentNameEl.value = componentName
-    }
-    disableCreateButton()
-  })
   routeNameEl.addEventListener('input', (e) => {
     routeName = e.target.value
     disableCreateButton()
   })
-
+  routeNameEl.addEventListener('click', (e) => {
+    routeName = e.target.value
+    disableCreateButton()
+  })
   if (fieldNameEl) {
     fieldNameEl.addEventListener('keyup', (event) => {
       // vscode.postMessage({ command: 'log', text: 'fieldNameEl.addEventListener created' })
-      const v = fieldNameEl.value.trim()
+      let v = fieldNameEl.value.trim().replace(/\\bstring\\b/, 'String')
       if (!v) {
         // vscode.postMessage({ command: 'log', text: 'field is empty' })
         return
       }
+      v = adjustFiledNameAndType(v);
       if (fields.includes(v)) {
         setTimeout(() => {
           fieldNameEl.style.color = 'red'
@@ -1958,10 +2165,9 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
   }
 
   createBtnEl.addEventListener('click', () => {
-    if (componentName && routeName && fields.length) {
-      const payload = { componentName, routeName, fields, embellishments: selectedCheckboxes() }
+    if (routeName && fields.length) {
+      const payload = { routeName, fields, embellishments: selectedCheckboxes() }
       vscode.postMessage({ command: 'createCrudSupport', payload: payload })
-      // console.log('payload', payload)
     }
   })
 </script>

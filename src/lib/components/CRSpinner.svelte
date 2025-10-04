@@ -1,20 +1,20 @@
 <!--
 @component
-	ButtonSpinner wraps an HTMLButtonElement named button, so it could be bound to a parent variable say
+	CRSpinner wraps an HTMLButtonElement named button, so it could be bound to a parent variable say
     let btnCreate:HTMLButtonElement
-  <ButtonSpinner bind:button={btnCreate} ...><ButtonSpinner>
+  <CRSpinner bind:button={btnCreate} ...><CRSpinner>
   and it is the only way to get reference to the embedded button.
-  There is no way for now to get reference via document.querySelector('ButtonSpinner')
-  or document.getElementsByTagName('ButtonSpinner')[0]
+  There is no way for now to get reference via document.querySelector('CRSpinner')
+  or document.getElementsByTagName('CRSpinner')[0]
 
-	ButtonSpinner component features a 3/4 circle skyblue spinner. In order to start and stop spinning its spinOn
+	CRSpinner component features a 3/4 circle skyblue spinner. In order to start and stop spinning its spinOn
 	property should be bound to a parent boolean variable, e.g. let loading:boolean = false (not a $state rune)
 	Spin starts when loading is set to true and stops when it is false
 	Mandatory props are 
 		- caption     -- a button title
     - spinOn      -- boolean controlling spin on/off  with loading true/false
-    - button      -- a parent variable bound to internal ButtonSpinner button via parent code like
-										import ButtonSpinner from '$lib/components/ButtonSpinner.svelte'
+    - button      -- a parent variable bound to internal CRSpinner button via parent code like
+										import CRSpinner from '$lib/components/CRSpinner.svelte'
 										let btnCreate:HTMLButtonElement
 										let cursor:boolean           -- true set it to 'pointer', false to 'not allowed'
 										let loading:boolean = false  -- keep spinner idle until loading = true
@@ -27,7 +27,7 @@
 										export const actions: Actions = {
 										createTodo: async ({ request }) => { ...
 										Property cursor is optional and is used to warn user for action not allowed
-										<ButtonSpinner 
+										<CRSpinner 
 												bind:button={btnCreate} 
 												caption='Create Todo' 
 												spinOn={loading}
@@ -42,12 +42,12 @@
 												spinnerSize='1.3rem'	/* spinner circle diameter, default is 1em but could be different */
 											  duration='3s'     		/* duration in seconds for one RPM, default is 1.5s */
 										>
-										</ButtonSpinner>
+										</CRSpinner>
 -->
 <script lang="ts">
-  export type TButtonSpinner = HTMLButtonElement & ButtonSpinner;
+  export type TButtonSpinner = HTMLButtonElement & CRSpinner;
 
-  type ButtonSpinner = {
+  type TProps = {
     caption: string;
     button: HTMLButtonElement;
     spinOn: boolean;
@@ -76,7 +76,7 @@
     top = `0`,
     width = 'max-content',
     height = '2rem',
-  }: ButtonSpinner = $props();
+  }: TProps = $props();
 </script>
 
 {#snippet spinner(color: string)}
