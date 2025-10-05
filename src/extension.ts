@@ -6,6 +6,7 @@ let rootPath: string | undefined;
 let routeName_ ='';
 let fields_:string[]=[];
 let embellishments_:string[]=[];
+
 function ensureComponentPath(){
   console.log('embellishments_', embellishments_)
   try{
@@ -24,7 +25,7 @@ function noType(name: string){
   return name.match(/([a-zA-z0-9_]+)\:?.*/)?.[1]
 }
 let buttons = `<div class='buttons'>
-  `;
+      `;
 function buttons_(){
   const spinner: boolean = embellishments_.includes('CRSpinner');
   ['create', 'update', 'delete'].forEach((caption) => {
@@ -48,6 +49,7 @@ function buttons_(){
       buttons + `</div>
       `
     })
+    return `// buttons_() called here`
 }
 
 function inputBox(fName:string){
@@ -211,7 +213,6 @@ function createFormPage(){
   ${buttons_()}
   </script>
   <form action="?/create" method="post" use:enhance={enhanceSubmit}>
-    <div class="buttons">
     ${inputBoxes}
     ${buttons}<button onclick={clearForm}>clear form</button>
     </div>
@@ -223,35 +224,35 @@ function createFormPage(){
 function createUtils(routeName:String, fields:string[]) {
 
   const utils = `export const sleep = async (ms: number) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // ms here is a dummy but required by
-      // resolve to send out some value
-      resolve(ms)
-    }, ms)
-  })
-}
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // ms here is a dummy but required by
+        // resolve to send out some value
+        resolve(ms)
+      }, ms)
+    })
+  }
   
   export const resetButtons = (buttons: HTMLButtonElement[]) => {
-  try {
-    buttons.forEach((btn) => {
-      btn.classList.remove('hidden')
-      btn.classList.add('hidden')
-      try {
-        btn.hidden = true
-      } finally {
-      }
-    })
-  } catch { }
-}
+    try {
+      buttons.forEach((btn) => {
+        btn.classList.remove('hidden')
+        btn.classList.add('hidden')
+        try {
+          btn.hidden = true
+        } finally {
+        }
+      })
+    } catch { }
+  }
   
   export const hideButtonsExceptFirst = (buttons: HTMLButtonElement[]) => {
-  resetButtons(buttons);
-  if (buttons[0] && buttons[0].classList.contains('hidden')) {
-    buttons[0].classList.toggle('hidden')
-    buttons[0].hidden = false
-  }
-}`
+    resetButtons(buttons);
+    if (buttons[0] && buttons[0].classList.contains('hidden')) {
+      buttons[0].classList.toggle('hidden')
+      buttons[0].hidden = false
+    }
+  }`;
 
   const utilsPath = path.join(rootPath as string, '/src/lib/utils');
   if (!fs.existsSync(utilsPath)) {
@@ -261,8 +262,16 @@ function createUtils(routeName:String, fields:string[]) {
   fs.writeFileSync(filePath, utils, 'utf8');
 
   const content = "export * from '/home/mili/TEST/cr-crud-extension/src/lib/utils/crHelpers';";
-  filePath = path.join(utilsPath, 'index.ts')
-  fs.writeFileSync(filePath, content, 'utf8');
+  filePath = path.join(utilsPath, 'index.ts');
+  if (!fs.existsSync(filePath)){
+    fs.writeFileSync(filePath, content, 'utf8');
+  } else {
+    // check if crHelpers are exported from /utils/index.ts
+    const exports = fs.readFileSync(filePath, 'utf8');
+    if (!exports.includes('crHelpers')){
+      fs.appendFileSync(filePath, content, 'utf8');
+    }
+  }
 }
 
 function createCRInput(){
@@ -1494,6 +1503,7 @@ export async function activate(context: vscode.ExtensionContext) {
           panel.webview.postMessage({
             command: "renderSchema",
             payload: parsedSchema,
+            rootPath: rootPath
           });
           // vscode.window.showErrorMessage('This is a test vscode.window.showErrorMessage');
         } catch (error) {
@@ -1540,6 +1550,17 @@ export async function activate(context: vscode.ExtensionContext) {
         // Empty body for now
         outputChannel.appendLine(`[WebView] Received payload:', ${routeName}, ${fields.join(', ')}, ${embellishments.join(', ')}`);
         outputChannel.show(true);
+      }
+      else if(msg.command === 'saveTypes'){
+        const appTypesPath = path.join(rootPath as string, '/src/app.d.ts');
+        let content = fs.readFileSync(appTypesPath, 'utf-8');
+        if (!content.includes('// CRAppTypes')){
+          content = content.trim().slice(0,-1) + `
+  // CRAppTypes from schema.prisma
+    ${msg.payload}
+}`;
+          fs.writeFileSync(appTypesPath, content, 'utf-8');
+        }
       }
       else if(msg.command === 'log'){
         // vscode.window.showInformationMessage(`Bane command log ${msg.text}`);
@@ -1667,7 +1688,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
     }
 
-    #schemaContainer {
+    #schemaContainerId {
       height: 30rem;
       overflow-y: auto;
     }
@@ -1880,7 +1901,7 @@ created in the route specified in the Route Name input box.
     </div>
     <div class='right-column'>
       <span class='prisma-model-caption'>Select Fields from ORM</span>
-      <div id="schemaContainer">
+      <div id="schemaContainerId">
       </div>
     </div>
   </div>
@@ -1907,6 +1928,7 @@ created in the route specified in the Route Name input box.
     };
   */
   let tablesModel = 'waiting for schemaModels '
+  let rootPath = ''
   const vscode = acquireVsCodeApi()
 
   // user clicks on fields list and it should click on a field name
@@ -1927,41 +1949,60 @@ created in the route specified in the Route Name input box.
     bubbles: true
   })
 
+  function dateTimeToDate(type){
+    if (type === 'DateTime'){
+      return 'Date';
+    }
+    return type;
+  }
   // a parsed schema from a Prisma ORM is sent back from the extension
   // and as it is an HTML collection we turn it into an Object with
   // entries to be destructed into individual object properties
   function renderParsedSchema(schemaModels) {
 
-    // get container to render the schema into
-    let container = document.getElementById('schemaContainer')
-    let markup = ''
+    // get containerEl to render the schema into
+    let containerEl = document.getElementById('schemaContainerId')
+    let markup = '';
+    let types = '';
+
     try {
       for (const [modelName, theFields] of Object.entries(schemaModels)) {
+
+        types += \`
+  type \${modelName} = {
+    \`
         const [, fields] = Object.entries(theFields)[0]
         let m = ''
         for (const [fieldName, { type, prismaSetting }] of Object.entries(fields)) {
           if ('0|1'.includes(fieldName)) continue
+          types += \`\${fieldName}: \${dateTimeToDate(type)};
+    \`;
           if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt') || prismaSetting.includes('@unique')) {
             m += \`<p>\${fieldName}</p><p>type:\${type} <span style='color:pink'>\${prismaSetting ?? 'na'}</span></p>\`
           } else {
             m += \`<p>\${fieldName}</p><p>type:\${type} \${prismaSetting ?? 'na'}</p>\`
           }
         }
+        types = types.slice(0,-3) +
+\` };
+\`;
         // render field name as a collapsed summary to reveal field list when expanded
         markup += \`<details>
           <summary class='model-name'>\${modelName}</summary>
           <div class='fields-column'>\${m}</div>
           </details>\`
       }
+          // console.log(types);
+      vscode.postMessage({ command: 'saveTypes', payload: types});
     } catch (err) {
       console.log('renderParsedSchema', err)
     }
-    // now all the markup constructed as a string render into  container
-    container.innerHTML = markup
+    // now all the markup constructed as a string render into  containerEl
+    containerEl.innerHTML = markup
 
-    // container gets click event but it has to be from the first <p> element
+    // containerEl gets click event but it has to be from the first <p> element
     // and that fieldname (innerText) id ignored if already saved in the fields
-    container.addEventListener('click', (event) => {
+    containerEl.addEventListener('click', (event) => {
 
       if (event.target.tagName === 'SUMMARY'){
         routeNameEl.value = event.target.innerText.toLowerCase();
@@ -1972,10 +2013,8 @@ created in the route specified in the Route Name input box.
       const el = event.target
       const fieldName = el.innerText
       // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
-      let type = el.nextSibling.innerText.match(/type:(\\S+)/)?.[1];
-      if (type === 'DateTime'){
-        type = 'Date';
-      }
+      let type = dateTimeToDate(el.nextSibling.innerText.match(/type:(\\S+)/)?.[1]);
+
       // the standard procedure for entering a new fieldname is via input box + Enter
       if (el.tagName === 'P' && el.nextSibling.tagName === 'P' && !fields.includes(fieldName)) {
         // we need input box so preserve its entry if any and restore after
@@ -1997,6 +2036,7 @@ created in the route specified in the Route Name input box.
     if (msg.command === 'renderSchema') {
       renderParsedSchema(msg.payload)
     }
+    rootPath = msg.rootPath;
   })
   
   // FieldsList elements use inline style for high specificity as they are created dynamically 
@@ -2019,7 +2059,7 @@ created in the route specified in the Route Name input box.
   const removeHintEl = document.getElementById('removeHintId')
   removeHintEl.style.opacity = '0'    // make it as a hidden tooltip
 
-  // when a fieldList container is full scroll it so the last element
+  // when a fieldList containerEl is full scroll it so the last element
   // is exposed visible
   const scroll = (el) => {
     if (

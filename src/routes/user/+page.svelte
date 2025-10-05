@@ -21,6 +21,10 @@
     password: String;
     createdAt: Date;
     articles: Article[];
+    posts: Post[];
+    profile: Profile?;
+    role: Role;
+    todos: Todo[];
     }
   let snap = $state<TFormData>({
     id: '',
@@ -30,6 +34,10 @@
     password: '',
     createdAt: '',
     articles: '',
+    posts: '',
+    profile: '',
+    role: '',
+    todos: '',
     });
 
   type ARGS = {
@@ -133,10 +141,9 @@
       clearMessage();
 
 
-  undefined
+  // buttons_() called here
   </script>
   <form action="?/create" method="post" use:enhance={enhanceSubmit}>
-    <div class="buttons">
     <CRInput title="Id"
       exportValueOn="enter|blur"
       capitalize={true}
@@ -186,9 +193,37 @@
       required={true}
     >
     </CRInput>
+    <CRInput title="posts"
+      exportValueOn="enter|blur"
+      capitalize={true}
+      bind:value={snap.posts}
+      required={true}
+    >
+    </CRInput>
+    <CRInput title="profile"
+      exportValueOn="enter|blur"
+      capitalize={true}
+      bind:value={snap.profile}
+      required={true}
+    >
+    </CRInput>
+    <CRInput title="role"
+      exportValueOn="enter|blur"
+      capitalize={true}
+      bind:value={snap.role}
+      required={true}
+    >
+    </CRInput>
+    <CRInput title="todos"
+      exportValueOn="enter|blur"
+      capitalize={true}
+      bind:value={snap.todos}
+      required={true}
+    >
+    </CRInput>
     
     <div class='buttons'>
-  <CRSpinner
+      <CRSpinner
         bind:this={btnCreate}
         spinOn={loading}
         caption=create
