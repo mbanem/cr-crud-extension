@@ -20,11 +20,3 @@ export const sleep = async (ms: number) => {
       })
     } catch { }
   }
-  
-  export const hideButtonsExceptFirst = (buttons: HTMLButtonElement[]) => {
-    resetButtons(buttons);
-    if (buttons[0] && buttons[0].classList.contains('hidden')) {
-      buttons[0].classList.toggle('hidden')
-      buttons[0].hidden = false
-    }
-  }

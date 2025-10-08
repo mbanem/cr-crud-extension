@@ -93,7 +93,7 @@
   ></div>
 {/snippet}
 
-<p style="position:relative;margin:0;padding:0;">
+<p style="position:relative;margin:0;padding:0;display:inline-block;">
   <!-- styling for an embedded button -->
   <button
     bind:this={button}
@@ -136,5 +136,8 @@
   }
   .hidden {
     display: none;
+  }
+  button {
+    display: inline-block;
   }
 </style>

@@ -10,35 +10,19 @@
   import * as utils from '$lib/utils';
   import CRInput from '$lib/components/CRInput.svelte';
   import CRSpinner from '$lib/components/CRSpinner.svelte';
-  import CRActivity from '$lib/components/CRActivity.svelte';
-  import CRTooltip from '$lib/components/CRTooltip.svelte';
-  import CRSummaryDetail from '$lib/components/CRSummaryDetail.svelte';
+  import type { User, Role, Profile, Article, Post, Category, Todo }  from '$lib/types/types';
   type TFormData = {
-    id: String;
-    firstName: String;
-    lastName: String;
-    email: String;
-    password: String;
-    createdAt: Date;
-    articles: Article[];
-    posts: Post[];
-    profile: Profile?;
-    role: Role;
-    todos: Todo[];
-    }
+    id: String | null;
+    firstName: String | null;
+    lastName: String | null;
+    email: String | null;
+    password: String | null;
+    
+  };
   let snap = $state<TFormData>({
-    id: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    createdAt: '',
-    articles: '',
-    posts: '',
-    profile: '',
-    role: '',
-    todos: '',
-    });
+    id: null,
+    firstName: null,lastName: null,email: null,password: null
+  });
 
   type ARGS = {
     data: PageData;
@@ -50,7 +34,7 @@
   let btnUpdate: HTMLButtonElement;
   let btnDelete: HTMLButtonElement;
   let iconDelete: HTMLSpanElement;
-
+  let result = '';
   const clearMessage = () => {
     setTimeout(() => {
       result = '';
@@ -67,28 +51,30 @@
     .replace(/\b[a-z](?=[a-z]{2})/g, (char) => char.toUpperCase())
   }
 
-  const routeName = capitalize(document.getElementById('routeNameId').value);
-
+  // const routeName = capitalize(document.getElementById('routeNameId').value);
+  // let routName = capitalize(`test-user`);
+  const fields:string[] = ["firstName: String","lastName: String","email: String","password: String"]
   function noType(name: string){
     return name.match(/([a-zA-z0-9_]+):?.*/)?.[1]
   }
 
+  const nullSnap = {
+    
+    id: null,
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    
+  }
+
   let formDataValid = $derived.by(() => {
-    fields.forEach(fName => {
-      const name = noType(fName);
-      if (!snap[name]){
-        return false;
-      }
-    })
-    return true;
+    return snap === nullSnap
   });
 
   const clearForm = (event?: MouseEvent | KeyboardEvent) => {
     event?.preventDefault();
-    fields.forEach(fName => {
-      const name = noType(fName);
-      snap[name] = ''
-    });
+    snap = nullSnap;
     utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
   };
   
@@ -118,7 +104,7 @@
           ? 'updating `${routeName}`...'
           : 'deleting `${routeName}`...';
     if (action.search === '?/delete') {
-      hideButtonsExceptFirst([btnDelete, btnCreate, btnUpdate]);
+      utils.hideButtonsExceptFirst([btnDelete, btnCreate, btnUpdate]);
     }
 
     return async ({ update }) => {
@@ -131,126 +117,108 @@
       } else if (action.search === '?/delete') {
         result = page.status === 200 ? '`${routeName}` deleted' : 'delete failed';
         iconDelete.classList.toggle('hidden');
-        hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
+        utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
       }
       invalidateAll();
       await utils.sleep(1000);
       loading = false; // stop spinner animation
       clearForm();
-      hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
+      utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
       clearMessage();
-
+  }
 
   // buttons_() called here
-  </script>
-  <form action="?/create" method="post" use:enhance={enhanceSubmit}>
-    <CRInput title="Id"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.Id}
-      required={true}
-    >
-    </CRInput>
+  }
+</script>
+<form action="?/create" method="post" use:enhance={enhanceSubmit}>
+  <div class='form-wrapper'>
     <CRInput title="firstName"
       exportValueOn="enter|blur"
       capitalize={true}
-      bind:value={snap.firstName}
+      bind:value={snap.firstName as string}
       required={true}
+      width='22.5rem'
     >
     </CRInput>
     <CRInput title="lastName"
       exportValueOn="enter|blur"
       capitalize={true}
-      bind:value={snap.lastName}
+      bind:value={snap.lastName as string}
       required={true}
+      width='22.5rem'
     >
     </CRInput>
     <CRInput title="email"
       exportValueOn="enter|blur"
       capitalize={true}
-      bind:value={snap.email}
+      bind:value={snap.email as string}
       required={true}
+      width='22.5rem'
     >
     </CRInput>
     <CRInput title="password"
       exportValueOn="enter|blur"
       capitalize={true}
-      bind:value={snap.password}
+      bind:value={snap.password as string}
       required={true}
-    >
-    </CRInput>
-    <CRInput title="createdAt"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.createdAt}
-      required={true}
-    >
-    </CRInput>
-    <CRInput title="articles"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.articles}
-      required={true}
-    >
-    </CRInput>
-    <CRInput title="posts"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.posts}
-      required={true}
-    >
-    </CRInput>
-    <CRInput title="profile"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.profile}
-      required={true}
-    >
-    </CRInput>
-    <CRInput title="role"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.role}
-      required={true}
-    >
-    </CRInput>
-    <CRInput title="todos"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.todos}
-      required={true}
+      width='22.5rem'
     >
     </CRInput>
     
-    <div class='buttons'>
+    <div class='buttons-row'>
+      <div class='buttons'>
       <CRSpinner
-        bind:this={btnCreate}
+        bind:button={btnCreate}
         spinOn={loading}
         caption=create
         formaction="?/create"
-        disabled={!formDataValid()}
+        disabled={!formDataValid}
         hidden={false}
       >
       </CRSpinner>
       <CRSpinner
-        bind:this={btnUpdate}
+        bind:button={btnUpdate}
         spinOn={loading}
         caption=update
         formaction="?/update"
-        disabled={!formDataValid()}
+        disabled={!formDataValid}
         hidden={false}
       >
       </CRSpinner>
       <CRSpinner
-        bind:this={btnDelete}
+        bind:button={btnDelete}
         spinOn={loading}
         caption=delete
         formaction="?/delete"
-        disabled={!formDataValid()}
+        disabled={!formDataValid}
         hidden={false}
       >
       </CRSpinner>
       <button onclick={clearForm}>clear form</button>
     </div>
-  </form>
+    </div>
+  </div>
+</form>
+<style lang='scss'>
+  .form-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: max-content;
+    padding: 1rem;
+    margin: 5rem auto;
+    border: 0.3px solid gray;
+    border-radius: 8px;
+    .buttons {
+      display: flex;
+      gap: 0.3rem;
+      justify-content: flex-end;
+      align-items: center;
+      button {
+        display: inline-block;
+      }
+    }
+  }
+</style>
   

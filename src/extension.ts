@@ -8,7 +8,7 @@ let fields_:string[]=[];
 let embellishments_:string[]=[];
 
 function ensureComponentPath(){
-  console.log('embellishments_', embellishments_)
+  // console.log('embellishments_', embellishments_)
   try{
     const componentsPath = path.join(rootPath as string, '/src/lib/components');
     if (!fs.existsSync(componentsPath)) {
@@ -29,16 +29,17 @@ let buttons = `<div class='buttons'>
 function buttons_(){
   const spinner: boolean = embellishments_.includes('CRSpinner');
   ['create', 'update', 'delete'].forEach((caption) => {
-    console.log('buttons_()', caption)
+    // console.log('buttons_()', caption)
     const cap = caption[0].toUpperCase() + caption.slice(1)
+    const hid = cap !== 'Create';
     if(spinner){
       buttons += `<CRSpinner
-        bind:this={btn${cap}}
+        bind:button={btn${cap}}
         spinOn={loading}
         caption=${caption}
         formaction="?/${caption}"
-        disabled={!formDataValid()}
-        hidden={false}
+        disabled={!formDataValid}
+        hidden={${hid}}
       >
       </CRSpinner>
       `
@@ -52,14 +53,30 @@ function buttons_(){
     return `// buttons_() called here`
 }
 
-function inputBox(fName:string){
-  const name = noType(fName)
+function asType(type:string){
+  console.log('asType type:', type);
+  switch(type){
+    case 'string':{
+      return 'as string';
+    }
+    case 'number':{
+      return 'as number';
+    }
+    case 'boolean':{
+      return 'as boolean';
+    }
+  }
+  return 'xx'
+}
+
+function inputBox(name:string, type: string){
   if (embellishments_.includes('CRInput')){
     return `<CRInput title="${name}"
       exportValueOn="enter|blur"
       capitalize={true}
-      bind:value={snap.${name}}
+      bind:value={snap.${name} ${asType(type)}}
       required={true}
+      width='22.5rem'
     >
     </CRInput>
     `
@@ -70,27 +87,106 @@ function inputBox(fName:string){
 function submitFunc(){
   return
 }
-function createFormPage(){
+function toArray(fields_: string[]){
+  const fields:string[] = [];
+  fields_.forEach(str => {
+    fields.push(`"${str}"`);
+  })
+  return fields;
+}
+
+let clean_snap = `
+    id: null,
+    `
+function initValues(fields_:string[]){
+  const fields: string[] = [];
+  fields_.forEach(fName => {
+    let [ , name, type] = fName.match(/(.+):\s*(\S+)/)?.map((m:string,index:number) => index===2 ? m.toLowerCase() : m); 
+
+    if (type.includes('[]')){
+      type = 'array'
+    }
+    type = type.replace(/\?/g,'');
+    // console.log(name, type)
+    switch(type){
+      case 'string':{
+        fields.push(`${name}: null`);
+        clean_snap += `${name}: '',
+    `;
+        break;
+      }
+      case 'number':{
+        fields.push(`${name}: 0`);
+        clean_snap += `${name}: 0,
+    `
+        break;
+      }
+      case 'date':{
+        fields.push(`${name}: null`);
+        clean_snap += `${name}: null,
+    `;
+        break;
+      }
+      case 'boolean':{
+        fields.push(`${name}: false`);
+        clean_snap += `${name}: false,
+    `;
+        break;
+      }
+      case 'array':{
+        fields.push(`${name}: []`);
+        clean_snap += `${name}: [],
+    `
+        break;
+      }
+      case 'role':{
+        fields.push(`${name}: 'VISITOR'`);
+        clean_snap += `${name}: 'VISITOR',
+    `
+        break;
+      }
+      default:{
+        fields.push(`${name}: ${type}`);
+        clean_snap += `${name}: null,
+    `
+        break;
+      }
+    }
+  })
+  return fields;
+}
+
+function nullType(fName:string){
+  // @ts-expect-error
+  let [ , name, type] = fName.match(/(.+):\s*(\S+)/)?.map((m:string,index:number) => index===2 ? m.toLowerCase() : m);
+  if (type.includes('[]')){
+    return fName + ' | []';
+  }else if(!'String|Number|Boolean|Date'.includes(type)){
+    return fName + ' | null';
+  }
+}
+let importTypes = 'import type {';
+function createFormPage(includeTypes: string){
   const pPagePath = path.join(rootPath as string, `/src/routes/${routeName_}`);
   if (!fs.existsSync(pPagePath)) {
     fs.mkdirSync(pPagePath, { recursive: true });
   }
     let TFormData = `type TFormData = {
-    id: String;
+    id: String | null;
     `
-  let inputBoxes = inputBox('Id')
+    let inputBoxes = '';
   
-  let data = `
+    
+    let snap = `
   let snap = $state<TFormData>({
-    id: '',
-    `
+    id: null,
+    ${initValues(fields_)}
+  `;
   fields_.forEach(fName=>{
-    TFormData += `${fName};
+    let [ , name, type] = fName.match(/(.+):\s*(\S+)/)?.map((m:string,index:number) => index===2 ? m.toLowerCase() : m);
+    TFormData += `${nullType(fName)};
     `
-    data += `${noType(fName)}: '',
-    `
-    inputBoxes += inputBox(fName)
-  
+    inputBoxes += inputBox(name, type)
   })
   let imports= ''
   embellishments_.forEach(comp => {
@@ -107,7 +203,11 @@ function createFormPage(){
   import { page } from '$app/state'; // for page.status code on actions
 
   import * as utils from '$lib/utils';
-  ` + imports + TFormData + `}` + data + `});
+  ` + imports
+    + includeTypes
+    + TFormData.replace(/\?/g, '') + `
+  };` + snap + 
+`});
 
   type ARGS = {
     data: PageData;
@@ -119,7 +219,7 @@ function createFormPage(){
   let btnUpdate: HTMLButtonElement;
   let btnDelete: HTMLButtonElement;
   let iconDelete: HTMLSpanElement;
-
+  let result = '';
   const clearMessage = () => {
     setTimeout(() => {
       result = '';
@@ -136,28 +236,24 @@ function createFormPage(){
     .replace(/\\b[a-z](?=[a-z]{2})/g, (char) => char.toUpperCase())
   }
 
-  const routeName = capitalize(document.getElementById('routeNameId').value);
-
+  // const routeName = capitalize(document.getElementById('routeNameId').value);
+  // let routName = capitalize(\`${routeName_}\`);
+  const fields:string[] = [${toArray(fields_)}]
   function noType(name: string){
     return name.match(/([a-zA-z0-9_]+)\:?.*/)?.[1]
   }
 
+  const nullSnap = {
+    ${clean_snap}
+  }
+
   let formDataValid = $derived.by(() => {
-    fields.forEach(fName => {
-      const name = noType(fName);
-      if (!snap[name]){
-        return false;
-      }
-    })
-    return true;
+    return snap === nullSnap
   });
 
   const clearForm = (event?: MouseEvent | KeyboardEvent) => {
     event?.preventDefault();
-    fields.forEach(fName => {
-      const name = noType(fName);
-      snap[name] = ''
-    });
+    snap = nullSnap;
     utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
   };` + `
   
@@ -187,7 +283,7 @@ function createFormPage(){
           ? 'updating \`\${routeName}\`...'
           : 'deleting \`\${routeName}\`...';
     if (action.search === '?/delete') {
-      hideButtonsExceptFirst([btnDelete, btnCreate, btnUpdate]);
+      utils.hideButtonsExceptFirst([btnDelete, btnCreate, btnUpdate]);
     }
 
     return async ({ update }) => {
@@ -200,23 +296,50 @@ function createFormPage(){
       } else if (action.search === '?/delete') {
         result = page.status === 200 ? '\`\${routeName}\` deleted' : 'delete failed';
         iconDelete.classList.toggle('hidden');
-        hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
+        utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
       }
       invalidateAll();
       await utils.sleep(1000);
       loading = false; // stop spinner animation
       clearForm();
-      hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
+      utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
       clearMessage();
-
+  }
 
   ${buttons_()}
-  </script>
-  <form action="?/create" method="post" use:enhance={enhanceSubmit}>
+  }
+</script>
+<form action="?/create" method="post" use:enhance={enhanceSubmit}>
+  <div class='form-wrapper'>
     ${inputBoxes}
-    ${buttons}<button onclick={clearForm}>clear form</button>
+    <div class='buttons-row'>
+      ${buttons}<button onclick={clearForm}>clear form</button>
     </div>
-  </form>
+    </div>
+  </div>
+</form>
+<style lang='scss'>
+  .form-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: max-content;
+    padding: 1rem;
+    margin: 5rem auto;
+    border: 0.3px solid gray;
+    border-radius: 8px;
+    .buttons {
+      display: flex;
+      gap: 0.3rem;
+      justify-content: flex-end;
+      align-items: center;
+      button {
+        display: inline-block;
+      }
+    }
+  }
+</style>
   `
   const filePath = path.join(pPagePath as string, '+page.svelte');
   fs.writeFileSync(filePath, markup, 'utf8');
@@ -245,14 +368,7 @@ function createUtils(routeName:String, fields:string[]) {
       })
     } catch { }
   }
-  
-  export const hideButtonsExceptFirst = (buttons: HTMLButtonElement[]) => {
-    resetButtons(buttons);
-    if (buttons[0] && buttons[0].classList.contains('hidden')) {
-      buttons[0].classList.toggle('hidden')
-      buttons[0].hidden = false
-    }
-  }`;
+`;
 
   const utilsPath = path.join(rootPath as string, '/src/lib/utils');
   if (!fs.existsSync(utilsPath)) {
@@ -634,7 +750,7 @@ function createCRSpinner(){
   ></div>
 {/snippet}
 
-<p style="position:relative;margin:0;padding:0;">
+<p style="position:relative;margin:0;padding:0;display:inline-block;">
   <!-- styling for an embedded button -->
   <button
     bind:this={button}
@@ -677,6 +793,9 @@ function createCRSpinner(){
   }
   .hidden {
     display: none;
+  }
+  button {
+    display: inline-block;
   }
 </style>
 `
@@ -1484,6 +1603,7 @@ export async function activate(context: vscode.ExtensionContext) {
       { enableScripts: true }
     );
 
+    let includeTypes = ''
     // const nonce = getNonce();
     panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
 
@@ -1537,7 +1657,7 @@ export async function activate(context: vscode.ExtensionContext) {
             funcList[fun]()
           }finally{}
         }
-        createFormPage();
+        createFormPage(includeTypes);
         buttons_();
         // if  (embellishments.includes('CRInput')){
         //   createCRInput();
@@ -1552,14 +1672,27 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel.show(true);
       }
       else if(msg.command === 'saveTypes'){
-        const appTypesPath = path.join(rootPath as string, '/src/app.d.ts');
-        let content = fs.readFileSync(appTypesPath, 'utf-8');
-        if (!content.includes('// CRAppTypes')){
-          content = content.trim().slice(0,-1) + `
+        const appTypesPath = path.join(rootPath as string, '/src/lib/types/');
+        if (!fs.existsSync(appTypesPath)) {
+          fs.mkdirSync(appTypesPath, { recursive: true });
+        }
+        includeTypes = msg.includeTypes;
+        // console.log('includeTypes', includeTypes)
+        const types = `
   // CRAppTypes from schema.prisma
-    ${msg.payload}
-}`;
-          fs.writeFileSync(appTypesPath, content, 'utf-8');
+  export type Role = 'USER' | 'ADMIN' | 'VISITOR';
+  ${msg.payload.replace(/DateTime/g, 'Date').replace(/\bInt\b/g, 'Number').replace(/\?/g, '')}
+  // import type { User, Profile, Role, Article, Post, Category, Todo } from '$lib/types/types'
+`
+
+        const appTypeFilePath = path.join(appTypesPath, 'types.ts')
+        if (fs.existsSync(appTypeFilePath)) {
+          let content = fs.readFileSync(appTypeFilePath, 'utf-8');
+          if (!content.includes('// CRAppTypes')){
+            fs.appendFileSync(appTypeFilePath, types, 'utf8');
+          }
+        }else{
+          fs.writeFileSync(appTypeFilePath, types, 'utf8');
         }
       }
       else if(msg.command === 'log'){
@@ -1878,23 +2011,23 @@ created in the route specified in the Route Name input box.
 
       <div class="embellishments">
         <div class="checkbox-item">
-          <input id="CRInput" type="checkbox" />
+          <input id="CRInput" type="checkbox" checked/>
           <label for="CRInput">CRInput component</label>
         </div>
         <div class="checkbox-item">
-          <input id="CRSpinner" type="checkbox" />
+          <input id="CRSpinner" type="checkbox" checked/>
           <label for="CRSpinner">CRSpinner component</label>
         </div>
         <div class="checkbox-item">
-          <input id="CRActivity" type="checkbox" />
+          <input id="CRActivity" type="checkbox" checked/>
           <label for="CRActivity">CRActivity component</label>
         </div>
         <div class="checkbox-item">
-          <input id="CRTooltip" type="checkbox" />
+          <input id="CRTooltip" type="checkbox" checked/>
           <label for="CRTooltip">Tooltip component</label>
         </div>
         <div class="checkbox-item">
-          <input id="CRSummaryDetail" type="checkbox" />
+          <input id="CRSummaryDetail" type="checkbox" checked/>
           <label for="CRSummaryDetail">Summary/Details component</label>
         </div>
       </div>
@@ -1955,6 +2088,8 @@ created in the route specified in the Route Name input box.
     }
     return type;
   }
+  
+  let routeName = ''
   // a parsed schema from a Prisma ORM is sent back from the extension
   // and as it is an HTML collection we turn it into an Object with
   // entries to be destructed into individual object properties
@@ -1964,17 +2099,22 @@ created in the route specified in the Route Name input box.
     let containerEl = document.getElementById('schemaContainerId')
     let markup = '';
     let types = '';
+    let includeTypes = 'import type { ';
 
     try {
       for (const [modelName, theFields] of Object.entries(schemaModels)) {
 
         types += \`
-  type \${modelName} = {
+  export type \${modelName} = {
     \`
+        includeTypes += modelName +', ';
+        if (modelName === 'User'){
+          includeTypes += 'Role, '
+        }
         const [, fields] = Object.entries(theFields)[0]
         let m = ''
         for (const [fieldName, { type, prismaSetting }] of Object.entries(fields)) {
-          if ('0|1'.includes(fieldName)) continue
+          if ('0|1'.includes(fieldName)) continue;
           types += \`\${fieldName}: \${dateTimeToDate(type)};
     \`;
           if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt') || prismaSetting.includes('@unique')) {
@@ -1992,8 +2132,9 @@ created in the route specified in the Route Name input box.
           <div class='fields-column'>\${m}</div>
           </details>\`
       }
-          // console.log(types);
-      vscode.postMessage({ command: 'saveTypes', payload: types});
+      includeTypes = includeTypes.slice(0,-2) + \` }  from '$lib/types/types';
+  \`;
+      vscode.postMessage({ command: 'saveTypes', payload: types, includeTypes});
     } catch (err) {
       console.log('renderParsedSchema', err)
     }
@@ -2014,6 +2155,10 @@ created in the route specified in the Route Name input box.
       const fieldName = el.innerText
       // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
       let type = dateTimeToDate(el.nextSibling.innerText.match(/type:(\\S+)/)?.[1]);
+      console.log('clicked type', type);
+      if (!'String|Number|Boolean'.includes(type)){
+        return;
+      }
 
       // the standard procedure for entering a new fieldname is via input box + Enter
       if (el.tagName === 'P' && el.nextSibling.tagName === 'P' && !fields.includes(fieldName)) {
@@ -2043,7 +2188,6 @@ created in the route specified in the Route Name input box.
   // by inserting innerHTML, so the inline style is in the listElCSS variable
   const listElCSS = 'color:black; font-size:14px; font-weight: 400; background-color: skyblue; margin: 2px 0 0 0;'
 
-  let routeName = ''
   // its data-filed-index are read via el.getAttribute('data-field-index')
   // or using camel case property name replacing 'data-' with .dataset
   // el.dataset.fieldIndex where data-field-index turn to .dataset.fieldIndex 
@@ -2059,7 +2203,7 @@ created in the route specified in the Route Name input box.
   const removeHintEl = document.getElementById('removeHintId')
   removeHintEl.style.opacity = '0'    // make it as a hidden tooltip
 
-  // when a fieldList containerEl is full scroll it so the last element
+  // when a fieldsList containerEl is full scroll it so the last element
   // is exposed visible
   const scroll = (el) => {
     if (
@@ -2105,20 +2249,21 @@ created in the route specified in the Route Name input box.
     routeName = e.target.value
     disableCreateButton()
   })
+
   if (fieldNameEl) {
     fieldNameEl.addEventListener('keyup', (event) => {
       // vscode.postMessage({ command: 'log', text: 'fieldNameEl.addEventListener created' })
       let v = fieldNameEl.value.trim().replace(/\\bstring\\b/, 'String')
       if (!v) {
         // vscode.postMessage({ command: 'log', text: 'field is empty' })
-        return
+        return;
       }
       v = adjustFiledNameAndType(v);
       if (fields.includes(v)) {
         setTimeout(() => {
           fieldNameEl.style.color = 'red'
         }, 0)
-        return
+        return;
       }
       if (fieldNameEl.style.color === 'red') {
         fieldNameEl.style.color = 'black'
