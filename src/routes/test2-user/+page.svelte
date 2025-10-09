@@ -14,18 +14,14 @@
   import CRTooltip from '$lib/components/CRTooltip.svelte';
   import CRSummaryDetail from '$lib/components/CRSummaryDetail.svelte';
   import type { User, Role, Profile, Article, Post, Category, Todo }  from '$lib/types/types';
-  type TFormData = {
-    id: String | null;
-    id: String | null;
-    firstName: String | null;
-    lastName: String | null;
-    email: String | null;
-    password: String | null;
+  type TFormData = {firstName | null;
+    lastName | null;
+    email | null;
+    password | null;
     
   };
   let snap = $state<TFormData>({
     
-    id: null,
     firstName: null,
     lastName: null,
     email: null,
@@ -60,15 +56,17 @@
   }
 
   // const routeName = capitalize(document.getElementById('routeNameId').value);
-  // let routName = capitalize(`test-user`);
-  const fields:string[] = ["id: String","firstName: String","lastName: String","email: String","password: String"]
+  // let routName = capitalize(`test2-user`);
+  const fields:string[] = ["firstName: String","lastName: String","email: String","password: String"]
   function noType(name: string){
     return name.match(/([a-zA-z0-9_]+):?.*/)?.[1]
   }
 
   const nullSnap = {
-    id: null,
     firstName: null,
+    lastName: null,
+    email: null,
+    password: nullfirstName: null,
     lastName: null,
     email: null,
     password: null
@@ -143,16 +141,9 @@
 </script>
 <form action="?/create" method="post" use:enhance={enhanceSubmit}>
   <div class='form-wrapper'>
-    <CRInput title="id"
-      exportValueOn="enter|blur"
-      capitalize={true}
-      bind:value={snap.id as string}
-      required={true}
-      width='22.5rem'
-    >
-    </CRInput>
     <CRInput title="firstName"
       exportValueOn="enter|blur"
+      type='string'
       capitalize={true}
       bind:value={snap.firstName as string}
       required={true}
@@ -161,6 +152,7 @@
     </CRInput>
     <CRInput title="lastName"
       exportValueOn="enter|blur"
+      type='string'
       capitalize={true}
       bind:value={snap.lastName as string}
       required={true}
@@ -169,7 +161,8 @@
     </CRInput>
     <CRInput title="email"
       exportValueOn="enter|blur"
-      capitalize={true}
+      type='string'
+      capitalize={false}
       bind:value={snap.email as string}
       required={true}
       width='22.5rem'
@@ -177,7 +170,8 @@
     </CRInput>
     <CRInput title="password"
       exportValueOn="enter|blur"
-      capitalize={true}
+      type='password'
+      capitalize={false}
       bind:value={snap.password as string}
       required={true}
       width='22.5rem'
@@ -186,6 +180,60 @@
     
     <div class='buttons-row'>
       <div class='buttons'>
+      <CRSpinner
+        bind:button={btnCreate}
+        spinOn={loading}
+        caption=create
+        formaction="?/create"
+        disabled={!formDataValid}
+        hidden={false}
+      >
+      </CRSpinner>
+      <CRSpinner
+        bind:button={btnUpdate}
+        spinOn={loading}
+        caption=update
+        formaction="?/update"
+        disabled={!formDataValid}
+        hidden={true}
+      >
+      </CRSpinner>
+      <CRSpinner
+        bind:button={btnDelete}
+        spinOn={loading}
+        caption=delete
+        formaction="?/delete"
+        disabled={!formDataValid}
+        hidden={true}
+      >
+      </CRSpinner>
+      <CRSpinner
+        bind:button={btnCreate}
+        spinOn={loading}
+        caption=create
+        formaction="?/create"
+        disabled={!formDataValid}
+        hidden={false}
+      >
+      </CRSpinner>
+      <CRSpinner
+        bind:button={btnUpdate}
+        spinOn={loading}
+        caption=update
+        formaction="?/update"
+        disabled={!formDataValid}
+        hidden={true}
+      >
+      </CRSpinner>
+      <CRSpinner
+        bind:button={btnDelete}
+        spinOn={loading}
+        caption=delete
+        formaction="?/delete"
+        disabled={!formDataValid}
+        hidden={true}
+      >
+      </CRSpinner>
       <CRSpinner
         bind:button={btnCreate}
         spinOn={loading}

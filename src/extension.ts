@@ -66,14 +66,34 @@ function asType(type:string){
       return 'as boolean';
     }
   }
-  return 'xx'
+  return ''
 }
-
+function inputType(name:string,type:string){
+  name = name.toLowerCase();
+  type = type.toLowerCase();
+  if (name==='password'){
+    return 'password';
+  }
+  if (type==='number'){
+    return 'number';
+  }
+  return 'text';
+}
+function toCapitalize(name:string, type:string){
+  console.log('toCapitalize','name',name,'type',type)
+  if ('id|password|email'.includes(name.toLowerCase())){
+    console.log('FALSE')
+    return false;
+  }
+  console.log('TRUE')
+  return true;
+}
 function inputBox(name:string, type: string){
   if (embellishments_.includes('CRInput')){
     return `<CRInput title="${name}"
       exportValueOn="enter|blur"
-      capitalize={true}
+      type='${inputType(name, type)}'
+      capitalize={${toCapitalize(name,type)}}
       bind:value={snap.${name} ${asType(type)}}
       required={true}
       width='22.5rem'
@@ -95,70 +115,65 @@ function toArray(fields_: string[]){
   return fields;
 }
 
-let clean_snap = `
-    id: null,
-    `
+let clean_snap = '';
 function initValues(fields_:string[]){
   const fields: string[] = [];
   fields_.forEach(fName => {
     let [ , name, type] = fName.match(/(.+):\s*(\S+)/)?.map((m:string,index:number) => index===2 ? m.toLowerCase() : m); 
 
+    clean_snap += name + `: null,
+    `;
     if (type.includes('[]')){
       type = 'array'
     }
     type = type.replace(/\?/g,'');
-    // console.log(name, type)
     switch(type){
       case 'string':{
-        fields.push(`${name}: null`);
-        clean_snap += `${name}: '',
-    `;
+        fields.push(`
+    ${name}: null`);
         break;
       }
       case 'number':{
-        fields.push(`${name}: 0`);
-        clean_snap += `${name}: 0,
-    `
+        fields.push(`
+    ${name}: 0`);
         break;
       }
       case 'date':{
-        fields.push(`${name}: null`);
-        clean_snap += `${name}: null,
-    `;
+        fields.push(`
+    ${name}: null`);
         break;
       }
       case 'boolean':{
-        fields.push(`${name}: false`);
-        clean_snap += `${name}: false,
-    `;
+        fields.push(`
+    ${name}: false`);
         break;
       }
       case 'array':{
-        fields.push(`${name}: []`);
-        clean_snap += `${name}: [],
-    `
+        fields.push(`
+    ${name}: []`);
         break;
       }
       case 'role':{
-        fields.push(`${name}: 'VISITOR'`);
-        clean_snap += `${name}: 'VISITOR',
-    `
+        fields.push(`
+    ${name}: 'VISITOR'`);
         break;
       }
       default:{
-        fields.push(`${name}: ${type}`);
-        clean_snap += `${name}: null,
-    `
+        fields.push(`
+    ${name}: ${type}`);
         break;
       }
     }
   })
+  clean_snap = clean_snap.replace(/,\s*$/,'')
+  console.log(clean_snap);
   return fields;
 }
 
 function nullType(fName:string){
   // @ts-expect-error
   let [ , name, type] = fName.match(/(.+):\s*(\S+)/)?.map((m:string,index:number) => index===2 ? m.toLowerCase() : m);
+  // fName includes type and we added | null
   if (type.includes('[]')){
     return fName + ' | []';
   }else if(!'String|Number|Boolean|Date'.includes(type)){
@@ -172,16 +187,15 @@ function createFormPage(includeTypes: string){
     fs.mkdirSync(pPagePath, { recursive: true });
   }
     let TFormData = `type TFormData = {
-    id: String | null;
     `
     let inputBoxes = '';
   
     
     let snap = `
   let snap = $state<TFormData>({
-    id: null,
     ${initValues(fields_)}
   `;
+
   fields_.forEach(fName=>{
     let [ , name, type] = fName.match(/(.+):\s*(\S+)/)?.map((m:string,index:number) => index===2 ? m.toLowerCase() : m);
     TFormData += `${nullType(fName)};
@@ -226,6 +240,30 @@ function createFormPage(includeTypes: string){
     }, 2000);
   };
 
+  // TODO: try to find out where to implement delete icon
+  // and the following snippets
+  /*
+    <span
+      bind:this={iconDelete}
+      onclick={() => {
+        btnDelete.click();
+      }}
+      aria-hidden={true}
+      ><span class="icon-delete" class:pink={wrongUser}>X</span></span
+    >
+    {@render deleteIcon()}
+
+    {#snippet deleteIcon()}
+      !-- <Tooltip class="tooltip-profile"> --
+      <p>delete the profile</p>
+      !-- </Tooltip> --
+    {/snippet}
+    {#snippet ownerOnly()}
+      !-- <Tooltip class="tooltip-profile"> --
+      <p class="pink">Owner only permission</p>
+      !-- </Tooltip> --
+    {/snippet}
+  */
   const capitalize = (str:string) => {
     const spaceUpper = (su:string) => {
       return \` \${su[1]?.toUpperCase()}\`
@@ -236,19 +274,21 @@ function createFormPage(includeTypes: string){
     .replace(/\\b[a-z](?=[a-z]{2})/g, (char) => char.toUpperCase())
   }
 
-  // const routeName = capitalize(document.getElementById('routeNameId').value);
-  // let routName = capitalize(\`${routeName_}\`);
-  const fields:string[] = [${toArray(fields_)}]
   function noType(name: string){
     return name.match(/([a-zA-z0-9_]+)\:?.*/)?.[1]
   }
 
+  // include only selected fields by user via this extension
   const nullSnap = {
     ${clean_snap}
   }
 
   let formDataValid = $derived.by(() => {
-    return snap === nullSnap
+    for (const [key, value] of Object.entries(snap)) {
+      if (key === 'id') continue;
+      if (!value) return false;
+    }
+    return true;
   });
 
   const clearForm = (event?: MouseEvent | KeyboardEvent) => {
@@ -259,21 +299,21 @@ function createFormPage(includeTypes: string){
   
   const enhanceSubmit: SubmitFunction = async ({ action, formData }) => {
     const required:string[] = [];
-    fields.forEach(fName => {
-      const name = noType(fName)
-      if(!formData.get(name)){
-        const req = ' -- '+ name +' is required';
-        const el = document.querySelector('[title="' + name +'"]')
+    for (const [key, value] of Object.entries(snap)) {
+      formData.set(key, value as string);
+      if(!value){
+        const req = key +' is required';
+        const el = document.querySelector('[title="' + key +'"]')
         if (el){
           (el as HTMLInputElement).placeholder += req;
-          required.push(req.slice(4))
+          required.push(req)
         }
       }
-    })
+    }  
+
     if (required.join('').length){
       return;
     }
-    // form is valid 
     loading = true; // start spinner animation
 
     result =
@@ -461,6 +501,7 @@ function createCRInput(){
     // IIFE
     exportValueOn = exportValueOn.toLowerCase() as TExportValueOn;
     // make combination be with 'enter|blur' and 'keypress|blur' if inverted
+    // so the blur always follows
     const parts = exportValueOn.split('|');
     if (parts.length > 1 && parts[0] === 'blur') {
       exportValueOn = \`\${parts[1]}|\${parts[0]}\` as TExportValueOn;
@@ -493,7 +534,7 @@ function createCRInput(){
   const onBlurHandler = (event: FocusEvent) => {
     event.preventDefault();
 
-    // no entry yet so no export is ready buy is dirty -- only handle placeholder if entry is required
+    // no entry yet so no export is ready but is dirty -- only handle placeholder if entry is required
     if (inputValue === '') {
       // input is required so warn the user with pink placeholder required message
       if (required) {
@@ -521,10 +562,9 @@ function createCRInput(){
       // as a workaround is updated instead
       inputEl.value = utils.capitalize(inputValue);
     }
-    // if keypress is Enter and exportValueOn does not include Enter we return
+
     if (exportValueOn.includes('enter') && event.key !== 'Enter') {
       if (capitalize && inputValue) {
-        // inputValue = capitalizes(inputValue);
         inputValue = utils.capitalize(inputValue);
       }
       return;
@@ -532,7 +572,7 @@ function createCRInput(){
     // already prevented blur|keypress and blur|enter
     // blur always follows if any case
     if (!'keypress|blur|enter|blur'.includes(exportValueOn)) {
-      inputValue = capitalizes(inputValue);
+      inputValue = (inputValue);
       return;
     }
     if (inputValue && inputValue.length > 0) {
@@ -568,7 +608,7 @@ function createCRInput(){
     inputEl.focus();
   };
 
-  // parent call to set input box value
+  // for parent call to set input box value
   export const setInputBoxValue = (str: string, blur: boolean = false) => {
     if (blur) {
       setTimeout(() => {
@@ -1068,7 +1108,7 @@ CRTooltip could accept the following props, though all are optional
 
   // Need to define variables as the setTooltipPos function adjusted them
   // to position properly based on preferredPos settings and available
-  // space around the hovering elements
+  // space around the hovering element
   let translateX = $state<string>('');
   let translateY = $state<string>('');
 
@@ -1083,8 +1123,6 @@ CRTooltip could accept the following props, though all are optional
   };
 
   let visible = $state(false);
-  // let ttRect: DOMRect | null = $state(null);
-  // let hoverRect: DOMRect | null = $state(null);
   let initial = $state(true);
 
   // the setTooltipPos examine necessary parameters for applying
@@ -1138,16 +1176,20 @@ CRTooltip could accept the following props, though all are optional
     // is there enough space at the right side of the screen for width and for height
     OK.topBottomRight =
       hoverRect.left - window.scrollX + tooltipRect.width < window.innerWidth;
+
     // is there enough space before the bottom side of the screen
     OK.leftRightBottom =
       hoverRect.top - window.scrollY + tooltipRect.height < window.innerHeight;
 
     OK.top =
       hoverRect.top - window.scrollY - toolbarHeight > tooltipRect.height;
+
     OK.bottom =
       hoverRect.bottom - window.scrollY + tooltipRect.height <
       window.innerHeight;
+
     OK.left = hoverRect.left - window.scrollX > tooltipRect.width;
+
     OK.right =
       hoverRect.right - window.scrollX + tooltipRect.width < window.innerWidth;
 
@@ -1182,11 +1224,13 @@ CRTooltip could accept the following props, though all are optional
         default:
           break;
       }
+      // if available position is found turn the tooltip on and exit teh loop
       if (translateX !== '') {
         visible = true;
         break;
       }
     }
+    // no available position was found so we improvise
     if (translateX === '') {
       translateY = OK.top
         ? \`\${-tooltipRect.height}px\`
@@ -1215,12 +1259,11 @@ CRTooltip could accept the following props, though all are optional
       //   tooltipPanelId,
       // ) as HTMLElement;
 
-      // if (ttPanelWrapper) {
       if (tooltipPanelEl) {
-        // ttPanel is panel  or captionPanel to be show as a tooltip
+        // ttPanel is a panel or a captionPanel to be show as a tooltip
         const ttPanel = tooltipPanelEl.children[0] as HTMLElement;
-        // hoveringEl is the element that triggers the tooltip
 
+        // hoveringEl is the element that triggers the tooltip
         // child wrapper children are hovering elements mouseenter/mouseleave
         const hoveringEl = document.getElementById(hoveringId) as HTMLElement;
 
@@ -1230,8 +1273,6 @@ CRTooltip could accept the following props, though all are optional
             hoveringEl.getBoundingClientRect() as DOMRect,
             ttPanel.getBoundingClientRect() as DOMRect,
           );
-
-
         }
 
         // Clean up after logging
@@ -1243,13 +1284,15 @@ CRTooltip could accept the following props, though all are optional
       translateX = '0px';
       translateY = '0px';
     });
-    // }
   });
 </script>
 
 <!-- 
     NOTE: transform:translate is defined in the fade-scale and must specify
     the same left/top values as the one in this tooltipPanelEl handler
+
+    On initial===true we find dimensions of tooltip panel wrapping it via 
+    @render and then destroy wrapper after getting dimensions
 -->
 {#if initial}
   <div
@@ -1453,7 +1496,7 @@ async function findPrismaSchemaRoot(): Promise<string | null> {
         return currentPath; // ✅ Found root containing prisma/schema.prisma
       }
 
-      // Walk up to parent
+      // Walk up to parent folder
       const parentPath = path.dirname(currentPath);
       if (parentPath === currentPath) {
         break; // reached filesystem root, stop
@@ -1471,7 +1514,7 @@ async function findPrismaSchemaRoot(): Promise<string | null> {
         "accent" would keep diacritics (ú vs u) but ignore case.
         "case" would respect case but ignore accents.
         "variant" is the strictest (default) and respects everything.
-        numeric sorts asc f10, f2 as f2 f10 not as ascii f10 f2
+        numeric sorts asc f10, f2 as f2 f10 -- not as the ascii's f10 f2
       */
       Object.entries(obj).sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }))
     );
@@ -1592,6 +1635,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // register Create CRUD Support 
   const disposable = vscode.commands.registerCommand('cr-crud-extension.createCrudSupport', () => {
     
+    // NOTE: Toe show workspaceFolders uncomment lines below
     // const workspaceFolders = vscode.workspace.workspaceFolders;
     // outputChannel.appendLine(`workspaceFolders', ${JSON.stringify(workspaceFolders,null,2)}`)
     // outputChannel.show(true);
@@ -1652,19 +1696,17 @@ export async function activate(context: vscode.ExtensionContext) {
           'CRTooltip': createCRTooltip,
           'CRSummaryDetail': createSummaryDetail,
         }
+        //  Object.values are function  references that create a specific page
+        //  and are executed based on the embellishments content picking the
+        // reference from the funcList above
         for(const fun of Object.values(embellishments)){
           try{
-            funcList[fun]()
+            funcList[fun]() // call the function reference
           }finally{}
         }
         createFormPage(includeTypes);
         buttons_();
-        // if  (embellishments.includes('CRInput')){
-        //   createCRInput();
-        // }
-        // if  (embellishments.includes('CRSpinner')){
-        //   createCRSpinner();
-        // }
+
         outputChannel.appendLine(`[WebView] createCrudSupport command entry point`);
         outputChannel.show(false);
         // Empty body for now
@@ -1720,6 +1762,8 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
   };
 
   vscode.window.showInformationMessage('Bane getWebviewContent vscode.Uri!');
+  
+  // returns a working HTML page that creates UI Form page with CRUD support
   return `<!DOCTYPE html>
 <html lang="en">
 
@@ -2095,6 +2139,7 @@ created in the route specified in the Route Name input box.
   // entries to be destructed into individual object properties
   function renderParsedSchema(schemaModels) {
 
+    vscode.postMessage({ command: 'log', text: 'renderParsedSchema() entry point' })
     // get containerEl to render the schema into
     let containerEl = document.getElementById('schemaContainerId')
     let markup = '';
@@ -2176,7 +2221,7 @@ created in the route specified in the Route Name input box.
 
   // Receive schema from the extension
   window.addEventListener("message", event => {
-    // vscode.postMessage({ command: 'log', text: 'got payload for renderParsedSchema()' })
+    vscode.postMessage({ command: 'log', text: 'got payload for renderParsedSchema()' })
     const msg = event.data;
     if (msg.command === 'renderSchema') {
       renderParsedSchema(msg.payload)
