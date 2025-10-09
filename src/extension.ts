@@ -485,7 +485,7 @@ function createCRInput(){
       if (str.split(' ').length > 3) return str;
       // @ts-expect-error
       str = str.capCamelCase();
-      const arr = str.match(/\s+/g);
+      const arr = str.match(/s+/g);
       if (!arr || arr.length > 3) return str;
     } catch (err) {
       console.log('capitalizes', err);
@@ -510,7 +510,6 @@ function createCRInput(){
   const topPosition = \`\${-1 * Math.floor(parseInt(fontsize) / 3)}px\`;
 
   // allow pre-defined values to show up when user specify them
-  let inputValue = $state<string>('');
 
   if (browser) {
     try {
@@ -535,7 +534,7 @@ function createCRInput(){
     event.preventDefault();
 
     // no entry yet so no export is ready but is dirty -- only handle placeholder if entry is required
-    if (inputValue === '') {
+    if (value === '') {
       // input is required so warn the user with pink placeholder required message
       if (required) {
         inputEl.placeholder = requiredStr;
@@ -547,7 +546,6 @@ function createCRInput(){
       }
     }
     if (exportValueOn.includes('blur')) {
-      value = inputValue;
       if (onInputIsReadyCallback) {
         onInputIsReadyCallback();
       }
@@ -560,22 +558,21 @@ function createCRInput(){
       // NOTE: reactive variable inputbox value does not updates
       // inputbox value when changed via script, so inputEl.value
       // as a workaround is updated instead
-      inputEl.value = utils.capitalize(inputValue);
+      value = utils.capitalize(value);
     }
 
     if (exportValueOn.includes('enter') && event.key !== 'Enter') {
-      if (capitalize && inputValue) {
-        inputValue = utils.capitalize(inputValue);
+      if (capitalize && value) {
+        value = utils.capitalize(value);
       }
       return;
     }
     // already prevented blur|keypress and blur|enter
     // blur always follows if any case
     if (!'keypress|blur|enter|blur'.includes(exportValueOn)) {
-      inputValue = (inputValue);
       return;
     }
-    if (inputValue && inputValue.length > 0) {
+    if (value && value.length > 0) {
       if (capitalize) {
       }
 
@@ -585,12 +582,11 @@ function createCRInput(){
         exportValueOn.includes('keypress') ||
         (exportValueOn.includes('enter') && event.key === 'Enter')
       ) {
-        value = inputValue;
 
         if (onInputIsReadyCallback) {
           onInputIsReadyCallback();
           if (clearOnInputIsReady) {
-            inputValue = '';
+            value = '';
           }
         }
       }
@@ -616,7 +612,7 @@ function createCRInput(){
       }, 1000);
     }
     inputEl.focus();
-    inputValue = str;
+    value = str;
   };
   onMount(() => {
     label = document.getElementsByTagName('label')[0] as HTMLLabelElement;
@@ -628,7 +624,7 @@ function createCRInput(){
     bind:this={inputEl}
     type={type ? type : 'text'}
     required
-    bind:value={inputValue}
+    bind:value
     onkeyup={onKeyUpHandler}
     onfocus={onFocusHandler}
     onblur={onBlurHandler}
