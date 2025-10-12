@@ -23,7 +23,7 @@ model User {
   passwordHash 	String   @map("password_hash")
   userAuthToken	String   @unique @map("user_auth_token")
 
-  role          Role    @default(USER)
+  role          Role    @default(VISITOR)
   posts   			Post[]
   profile 			Profile?
 
@@ -41,6 +41,7 @@ model User {
 enum Role {
   USER
   ADMIN
+  VISITOR
 }
 model Profile {
   id     		String  @id @default(uuid())
@@ -148,21 +149,41 @@ model Todo {
 //  pnpx prisma generate
 //  -- insert into category
 
-// insert into category (name) values("JavaScript"),
-//  ("Typescript"),
-//  ("Svelte"),
-//  ("SvelteKit"),
-//  ("CSS"),
-//  ("SCSS"),
-//  ("Prisma ORM"),
-//  ("PostgreSQL"),
-//  ("GSAP"),
-//  ("Vite"),
-//  ("BCrypt"),
-//  ("Articles"),
-//  ("Comments"),
-//  ("Documents"),
-//  ("eMails"),
-//  ("Presentations"),
-//  ("Blogs"),
-//  ("Publications");
+
+// NOTE: field names in apostrophes not in quotas as PostgreSQL
+// will try for find such objects
+// insert into category (name) values('JavaScript'),
+//  ('Typescript'),
+//  ('Svelte'),
+//  ('SvelteKit'),
+//  ('CSS'),
+//  ('SCSS'),
+//  ('Prisma ORM'),
+//  ('PostgreSQL'),
+//  ('GSAP'),
+//  ('Vite'),
+//  ('BCrypt'),
+//  ('Articles'),
+//  ('Comments'),
+//  ('Documents'),
+//  ('eMails'),
+//  ('Presentations'),
+//  ('Blogs'),
+//  ('Publications');
+
+
+
+/*
+.env
+DATABASE_URL="postgresql://mili:kiki@localhost:5432/forms?schema=public"
+SECRET_APT_KEY="kiki:kiki@localhost:5432
+SECRET_APT_ENV=development
+SECRET_API_KEY=1234567890
+
+pnpm install prisma --save-dev
+pnpm install @prisma/client
+
+pnpx prisma init
+pnpx prisma migrate reset
+pnpx prisma migrate dev --name init
+*/

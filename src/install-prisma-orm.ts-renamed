@@ -1,0 +1,257 @@
+import * as vscode from 'vscode'; import * as fs from 'fs'; import * as path
+from 'path';
+
+
+async function findPrismaSchemaRoot(): Promise<string | null> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders?.length) {
+    return null; // No workspace open
+  }
+
+  for (const folder of workspaceFolders) {
+    let currentPath = folder.uri.fsPath;
+
+    while (true) {
+      const prismaSchemaPath = path.join(currentPath, "prisma", "schema.prisma");
+
+      if (fs.existsSync(prismaSchemaPath)) {
+        return currentPath; // ✅ Found root containing prisma/schema.prisma
+      }
+
+      // Walk up to parent folder
+      const parentPath = path.dirname(currentPath);
+      if (parentPath === currentPath) {
+        break; // reached filesystem root, stop
+      }
+      currentPath = parentPath;
+    }
+  }
+    return null
+  }
+  
+
+export async function activate(context: vscode.ExtensionContext) {
+
+  const workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined = vscode.workspace.workspaceFolders;
+
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+
+      // Fallback to dialog if default path is invalid
+      const folderUri: vscode.Uri[] | undefined = await vscode.window.showOpenDialog({
+        canSelectFolders: true,
+        canSelectFiles: false,
+        openLabel: 'Select workspace folder with Prisma/schema.prisma',
+        defaultUri: vscode.Uri.file(defaultFolderPath)
+      });
+      if (!folderUri || folderUri.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder selected');
+        return;
+      }
+      rootPath = folderUri[0].fsPath;
+
+  } else {
+    rootPath = workspaceFolders[0].uri.fsPath;
+  }
+  // Create output channel for webview logs
+  const outputChannel = vscode.window.createOutputChannel('WebView Logs');
+
+  // vscode.debug.onDidStartDebugSession(session => {
+  //   outputChannel.appendLine(`onDidStartDebugSession activated`);
+  //   outputChannel.show(true);
+  //   if (session.name === "Run Extension (with pak)") {
+  //     vscode.commands.executeCommand("cr-crud-extension.createCrudSupport");
+  //   }
+  // });
+
+  // context.subscriptions.push(
+  //   vscode.debug.onDidStartDebugSession(session => {
+  //     if (session.name === "Run Extension (with pak)") {
+  //       vscode.commands.executeCommand("cr-crud-extension.createCrudSupport")
+  //         .then(undefined, err => console.error("Failed to run CRUD support:", err));
+  //     }
+  //   })
+  // );
+
+
+  // register Create CRUD Support 
+  const disposable = vscode.commands.registerCommand('cr-crud-extension.createCrudSupport', () => {
+    
+    // NOTE: Toe show workspaceFolders uncomment lines below
+    // const workspaceFolders = vscode.workspace.workspaceFolders;
+    // outputChannel.appendLine(`workspaceFolders', ${JSON.stringify(workspaceFolders,null,2)}`)
+    // outputChannel.show(true);
+
+    const panel = vscode.window.createWebviewPanel(
+      'crCrudSupport',
+      'Create CRUD Form Support',
+      vscode.ViewColumn.One,
+      { enableScripts: true }
+    );
+
+    let includeTypes = ''
+    // const nonce = getNonce();
+    panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
+
+    panel.webview.onDidReceiveMessage(async (msg) => {
+      
+      if(msg.command==='readSchema'){
+
+        try {
+
+          const prismaSchemaPath = path.join(rootPath as string, "prisma", "schema.prisma");
+          const schemaContent = fs.readFileSync(prismaSchemaPath, "utf-8");
+
+          const parsedSchema = parsePrismaSchema(schemaContent);
+
+          // TODO: parse schemaContent and send back to WebView
+          // ---------------------- JSON parser schemaModels via command sendingSchemaModel  ----------------------
+          panel.webview.postMessage({
+            command: "renderSchema",
+            payload: parsedSchema,
+            rootPath: rootPath
+          });
+          // vscode.window.showErrorMessage('This is a test vscode.window.showErrorMessage');
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to read schema: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+      else if (msg.command === 'createCrudSupport') {
+        const {routeName, fields, embellishments } = msg.payload as {
+          routeName: string;
+          fields: string[];
+          embellishments:string[];
+        };
+        type FuncList = {
+          [funcName: string]: Function;
+        };
+        routeName_ = routeName;
+        fields_= fields;
+        embellishments_ = embellishments;
+        createUtils(routeName, fields);
+        const funcList: FuncList = {
+          'CRInput': createCRInput,
+          'CRSpinner':createCRSpinner,
+          'CRActivity': createCRActivity,
+          'CRTooltip': createCRTooltip,
+          'CRSummaryDetail': createSummaryDetail,
+        }
+        //  Object.values are function  references that create a specific page
+        //  and are executed based on the embellishments content picking the
+        // reference from the funcList above
+        for(const fun of Object.values(embellishments)){
+          try{
+            funcList[fun]() // call the function reference
+          }finally{}
+        }
+        createFormPage(includeTypes);
+        buttons_();
+
+        outputChannel.appendLine(`[WebView] createCrudSupport command entry point`);
+        outputChannel.show(false);
+        // Empty body for now
+        outputChannel.appendLine(`[WebView] Received payload:', ${routeName}, ${fields.join(', ')}, ${embellishments.join(', ')}`);
+        outputChannel.show(true);
+      }
+      else if(msg.command === 'saveTypes'){
+        const appTypesPath = path.join(rootPath as string, '/src/lib/types/');
+        if (!fs.existsSync(appTypesPath)) {
+          fs.mkdirSync(appTypesPath, { recursive: true });
+        }
+        includeTypes = msg.includeTypes;
+        // console.log('includeTypes', includeTypes)
+        const types = `
+  // CRAppTypes from schema.prisma
+  export type Role = 'USER' | 'ADMIN' | 'VISITOR';
+  ${msg.payload.replace(/DateTime/g, 'Date').replace(/\bInt\b/g, 'Number').replace(/\?/g, '')}
+  // import type { User, Profile, Role, Article, Post, Category, Todo } from '$lib/types/types'
+`
+
+        const appTypeFilePath = path.join(appTypesPath, 'types.ts')
+        if (fs.existsSync(appTypeFilePath)) {
+          let content = fs.readFileSync(appTypeFilePath, 'utf-8');
+          if (!content.includes('// CRAppTypes')){
+            fs.appendFileSync(appTypeFilePath, types, 'utf8');
+          }
+        }else{
+          fs.writeFileSync(appTypeFilePath, types, 'utf8');
+        }
+      }
+      else if(msg.command === 'log'){
+        // vscode.window.showInformationMessage(`Bane command log ${msg.text}`);
+        vscode.window.showInformationMessage(`log ${msg.text}`);
+        // log should have at least a text property
+        // Or log to output channel
+        outputChannel.appendLine(`[WebView log outputChannel ${msg.text}] `);
+        outputChannel.show(true); // false = don't preserve focus
+      }
+    });
+  });
+
+  context.subscriptions.push(disposable);
+}
+
+export function deactivate() {}
+
+function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+
+  // Enable scripts in the webview
+  webview.options = {
+    enableScripts: true,
+    localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
+  };
+
+  vscode.window.showInformationMessage('Bane getWebviewContent vscode.Uri!');
+  
+  // returns a working HTML page that creates UI Form page with CRUD support
+  return `<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <style>
+    .offer-install-prisma {
+      width:65vw;
+      margin: 4rem auto;
+  </style>
+</head>
+<body>
+
+  <div>
+    <h2 style='margin-left:8rem;'>Installing Prisma ORM</h2>
+
+    <pre class='offer-install-prisma'>
+The Extension found that Prisma ORM is not installed in your project and it
+can help you install it. It will add al necessary npm packages and initiate
+Prisma in this project installing a very basic schema in prisma/schema.prisma
+file. After that it will pause or better yet closed abandoning the further 
+installation  until you prepare your database models/tables overwriting the schema.prisma file
+and continuing with extension if left paused. or launch it again, but now 
+the component will find the schema.prisma file and will continue with asking
+you to select model and appropriate fields to create CRUD form support.
+Note: Database contains some private fields that should not exposed to the
+outside word, like passwordHash, user authentication token userAuthToken, createdAt,
+updatedAt as they are managed automatically by the Prisma ORM. Those fields are
+usually rendered in pink for your attention.
+
+<button id='install-prisma-btn' style='margin-left:2rem; padding:0.5rem 1rem; font-size:1rem; cursor:pointer;'>Install Prisma ORM</button>
+<button id='cancel-btn' style='margin-left:2rem; padding:0.5rem 1rem; font-size:1rem; cursor:pointer;'>Cancel</button>
+<script>
+  const vscode = acquireVsCodeApi();
+  
+  document.getElementById('install-prisma-btn').addEventListener('click', () => {
+    vscode.postMessage({ command: 'installPrisma' });
+  });
+  document.getElementById('cancel-btn').addEventListener('click', () => {
+    vscode.postMessage({ command: 'cancel' });
+  });
+</script>
+
+</pre>
+  </div>
+
+</body>
+</html>
+  `;
+}

@@ -6,6 +6,15 @@ let rootPath: string | undefined;
 let routeName_ ='';
 let fields_:string[]=[];
 let embellishments_:string[]=[];
+let terminal: vscode.Terminal | undefined;
+
+function sendToTerminal(cmd: string) {
+  if (!terminal) {
+    terminal = vscode.window.createTerminal(`WebView Terminal`);
+  }
+  terminal.show(true); // reveal the terminal
+  terminal.sendText(cmd);
+}
 
 function ensureComponentPath(){
   // console.log('embellishments_', embellishments_)
@@ -1644,8 +1653,9 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     let includeTypes = ''
+    let noPrismaSchema = false;
     // const nonce = getNonce();
-    panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
+    panel.webview.html = getWebviewContent(panel.webview, context.extensionUri, noPrismaSchema);
 
     panel.webview.onDidReceiveMessage(async (msg) => {
       
@@ -1749,7 +1759,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
-function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, noPrismaSchema:boolean): string {
 
   // Enable scripts in the webview
   webview.options = {
@@ -2014,6 +2024,18 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
       font-weight: 400 !important;
       font-size: 12px !important;
     }
+    button {
+      display:inline-block;
+      margin: 1rem 1rem 1rem 0;
+      background-color: navy;
+      color: yellow;
+      border: 1px solid gray;
+      border-radius: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 3px 1rem;
+      user-select: none;
+    }
   </style>
 
 </head>
@@ -2023,6 +2045,47 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
   <div class='main-grid'>
     <div class='grid-wrapper'>
+    <pre id='installPrismaPartOneId' class='span-two'>
+      <h3>Prisma Installation Part One</h3>
+The Extension found that Prisma ORM is not installed in your project and it
+can help you install it. In this first part of the installation it will add all 
+the necessary packages and initiate Prisma in this project installing a very basic
+schema in prisma/schema.prisma file at the root of the project and set a connection
+string in the .env file that it created. 
+After that it could pause waiting for you to replace prisma/schema.prisma 
+with your models/tables and set the proper connection string. It will offer you
+a continue button to enter the final commands listed below.
+But if you prefer to cancel the extension in order to prepare the schema and the
+connection yourself, then you would have to issue yourself the following commands 
+from a Terminal
+
+          pnpx prisma migrate dev --name init
+          // in case of a conflict with the previous migration history, run
+          pnpx prisma migrate reset
+          // and repeat
+          pnpx prisma migrate dev --name init
+          // and finally generate the Prisma client
+          pnpx prisma generate
+          <button id='installPartOneBtnId'>Install Prisma ORM</button><button id='cancelPartOneBtnId'>Cancel</button>
+      </pre>
+
+      <pre id='installPartTwoId' class='span-two'>
+          <h3>Prisma Installation Part Two</h3>
+          The extension  will issue the final commands for installing Prisma
+          when you select continue, otherwise you can enter yourself the
+          commands mentioned in the Prisma Installation Part One:
+
+              pnpx prisma migrate dev --name init
+              // in case of a conflict with the previous migration history, run
+              pnpx prisma migrate reset
+              // and repeat
+              pnpx prisma migrate dev --name init
+              // and finally generate the Prisma client
+              pnpx prisma generate
+
+              <button id='installPartTwoBtnId'>continue</button><button id='cancelPartTwoBtnId'>cancel</button>  
+      </pre>
+          
       <pre class="span-two">
 To create a UI Form for CRUD operations against the underlying ORM fill
 out the <i>Candidate Fields</i> by entering field names in the <i>Field Name</i> input
@@ -2103,6 +2166,9 @@ created in the route specified in the Route Name input box.
   let tablesModel = 'waiting for schemaModels '
   let rootPath = ''
   const vscode = acquireVsCodeApi()
+  const noSchema = ${noPrismaSchema} ? true : false;
+  let noSchemaText = 'based on variable noPrismaSchema got from getWebviewContent '
+  noSchemaText += ${noPrismaSchema} ? 'yes, schema found' : 'found no schema';
 
   // user clicks on fields list and it should click on a field name
   // rendered in skyblue
@@ -2218,11 +2284,12 @@ created in the route specified in the Route Name input box.
   // Receive schema from the extension
   window.addEventListener("message", event => {
     vscode.postMessage({ command: 'log', text: 'got payload for renderParsedSchema()' })
+    vscode.postMessage({ command: 'log', text:  noSchemaText })
     const msg = event.data;
     if (msg.command === 'renderSchema') {
       renderParsedSchema(msg.payload)
+      rootPath = msg.rootPath;
     }
-    rootPath = msg.rootPath;
   })
   
   // FieldsList elements use inline style for high specificity as they are created dynamically 

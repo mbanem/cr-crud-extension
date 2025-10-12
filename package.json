@@ -28,8 +28,11 @@
     "pak": "tsc -p ./;  vsce package --no-dependencies; VERSION=$(jq -r '.version' /home/mili/TEST/cr-crud-extension/package.json); code --install-extension /home/mili/TEST/cr-crud-extension/cr-crud-extension-${VERSION}.vsix;"
   },
   "devDependencies": {
-    "@types/vscode": "^1.1.37",
+    "@prisma/client": "^6.17.1",
     "@types/node": "24.5.2",
+    "@types/vscode": "^1.1.37",
+    "prisma": "^6.17.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.0",
     "vscode": "^1.1.37"
   },
