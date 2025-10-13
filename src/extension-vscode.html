@@ -398,7 +398,7 @@ created in the route specified in the Route Name input box.
   */
   let tablesModel = 'waiting for schemaModels '
   let rootPath = ''
-  // const vscode = acquireVsCodeApi()
+  const vscode = acquireVsCodeApi()
   const noPrismaSchema = false
 
   let noSchemaText = 'based on variable noPrismaSchema got from getWebviewContent ' + noPrismaSchema ? 'FOUND NO SCHEMA' : 'YES, SCHEMA FOUND'
@@ -415,8 +415,8 @@ created in the route specified in the Route Name input box.
   let rightColumnEl
 
   window.addEventListener('load', function () {
-    console.log('WINDOW LOAD EVENT CALLED')
-    console.log(noSchemaText)
+    vscode.postMessage(command: ('WINDOW LOAD EVENT CALLED')
+    // vscode.postMessage({} command: 'log: text: (noSchemaText) })
     // Code to be executed after the page and all resources are loaded
 
     crudUIBlockEl = document.getElementById('crudUIBlockId')
@@ -424,22 +424,22 @@ created in the route specified in the Route Name input box.
     installPartOneEl = document.getElementById('installPartOneId')
     installPartTwoEl = document.getElementById('installPartTwoId')
     installPartOneBtnEl = document.getElementById('installPartOneBtnId')
-    // installPartOneBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'installPrisma' })
-    // }
+    installPartOneBtnEl.addEventListener('click', () => {
+      vscode.postMessage({ command: 'installPrisma' })
+    })
     cancelPartOneBtnEl = document.getElementById('cancelPartOneBtnId')
-    // cancelPartOneBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'cancel' })
-    // }
+    cancelPartOneBtnEl.addEventListener('click', () => {
+      vscode.postMessage({ command: 'cancel' })
+    })
     installPartTwoBtnEl = document.getElementById('installPartTwoBtnId')
-    // installPartTwoBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'installPrismaPartTwo' })
-    // }
-    // cancelPartTwoBtnEl = document.getElementById('cancelPartTwoBtnId');
-    // cancelPartTwoBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'cancel' })
-    // }
-    console.log('BEFORE TURNING PARTS VISIBLE')
+    installPartTwoBtnEl.addEventListener('click', () => {
+      vscode.postMessage({ command: 'installPrismaPartTwo' })
+    })
+    cancelPartTwoBtnEl = document.getElementById('cancelPartTwoBtnId')
+    cancelPartTwoBtnEl.addEventListener('click', () => {
+      vscode.postMessage({ command: 'cancel' })
+    })
+    vscode.postMessage(command: ('BEFORE TURNING PARTS VISIBLE')
     // crudUIBlockEl.classList.remove('hidden')
     // setTimeout(()=>{
     // rightColumnEl.style.display = 'block';
@@ -489,7 +489,7 @@ created in the route specified in the Route Name input box.
   // entries to be destructed into individual object properties
   function renderParsedSchema(schemaModels) {
 
-    console.log('renderParsedSchema() entry point')
+    vscode.postMessage(command: ('renderParsedSchema() entry point')
     // get containerEl to render the schema into
     let containerEl = document.getElementById('schemaContainerId')
     let markup = ''
@@ -499,9 +499,9 @@ created in the route specified in the Route Name input box.
     try {
       for (const [modelName, theFields] of Object.entries(schemaModels)) {
 
-        types += `
-  export type ${modelName} = {
-    `
+        types += \`
+  export type \${modelName} = {
+    \`
         includeTypes += modelName + ', '
         if (modelName === 'User') {
           includeTypes += 'Role, '
@@ -510,28 +510,28 @@ created in the route specified in the Route Name input box.
         let m = ''
         for (const [fieldName, { type, prismaSetting }] of Object.entries(fields)) {
           if ('0|1'.includes(fieldName)) continue
-          types += `${fieldName}: ${dateTimeToDate(type)};
-    `
+          types += \`\${fieldName}: \${dateTimeToDate(type)};
+    \`
           if (prismaSetting.includes('@default') || prismaSetting.includes('@updatedAt') || prismaSetting.includes('@unique')) {
-            m += `<p>${fieldName}</p><p>type:${type} <span style='color:pink'>${prismaSetting ?? 'na'}</span></p>`
+            m += \`<p>\${fieldName}</p><p>type:\${type} <span style='color:pink'>\${prismaSetting ?? 'na'}</span></p>\`
           } else {
-            m += `<p>${fieldName}</p><p>type:${type} ${prismaSetting ?? 'na'}</p>`
+            m += \`<p>\${fieldName}</p><p>type:\${type} \${prismaSetting ?? 'na'}</p>\`
           }
         }
         types = types.slice(0, -3) +
-          ` };
-`
+          \` };
+\`
         // render field name as a collapsed summary to reveal field list when expanded
-        markup += `<details>
-          <summary class='model-name'>${modelName}</summary>
-          <div class='fields-column'>${m}</div>
-          </details>`
+        markup += \`<details>
+          <summary class='model-name'>\${modelName}</summary>
+          <div class='fields-column'>\${m}</div>
+          </details>\`
       }
-      includeTypes = includeTypes.slice(0, -2) + ` }  from '$lib/types/types';
-  `
-      // vscode.postMessage({ command: 'saveTypes', payload: types, includeTypes })
+      includeTypes = includeTypes.slice(0, -2) + \` }  from '\$lib/types/types';
+  \`
+      vscode.postMessage({ command: 'saveTypes', payload: types, includeTypes })
     } catch (err) {
-      console.log('renderParsedSchema', err)
+      vscode.postMassage({command: 'log',  text: 'renderParsedSchema: ' + err });
     }
     // now all the markup constructed as a string render into  containerEl
     containerEl.innerHTML = markup
@@ -550,7 +550,7 @@ created in the route specified in the Route Name input box.
       const fieldName = el.innerText
       // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
       let type = dateTimeToDate(el.nextSibling.innerText.match(/type:(\\S+)/)?.[1])
-      console.log('clicked type', type)
+      vscode.postMassage({command: 'log',  text: ('clicked type', type) });
       if (!'String|Number|Boolean'.includes(type)) {
         return
       }
@@ -559,7 +559,7 @@ created in the route specified in the Route Name input box.
       if (el.tagName === 'P' && el.nextSibling.tagName === 'P' && !fields.includes(fieldName)) {
         // we need input box so preserve its entry if any and restore after
         const savedEntry = fieldNameEl.value
-        fieldNameEl.value = `${fieldName}: ${type}`
+        fieldNameEl.value = \`\${fieldName}: \${type}\`
         fieldNameEl.dispatchEvent(enterKeyEvent)
         fieldNameEl.value = savedEntry
       }
@@ -567,12 +567,12 @@ created in the route specified in the Route Name input box.
   }
 
   // Request schema from the active extension
-  // vscode.postMessage({ command: 'readSchema' })
+  vscode.postMessage({ command: 'readSchema' })
 
   // Receive schema from the extension
   window.addEventListener("message", event => {
-    console.log('got payload for renderParsedSchema()')
-    // console.log( noSchemaText )
+    vscode.postMassage({command: 'log',  text: 'got payload for renderParsedSchema()' });
+    // vscode.postMassage({command: 'log',  text:  noSchemaText  });
     const msg = event.data
     if (msg.command === 'renderSchema') {
       renderParsedSchema(msg.payload)
@@ -622,9 +622,9 @@ created in the route specified in the Route Name input box.
     val = val.replace(/\\s+/g, '')
 
     if (!val.match(/\\s*[a-zA-z0-9_]+\\s*\\:\\s*([a-zA-z0-9_]+)/)?.[1]) {
-      val = val.replace(/\\:.*$/, '') + ': string'
+      val = val.replace(/\\:.*\$/, '') + ': string'
     } else {
-      val = val.replace(/([a-zA-z0-9_]+)\:([a-zA-z0-9_]+)/, '$1: $2')
+      val = val.replace(/([a-zA-z0-9_]+)\:([a-zA-z0-9_]+)/, '\$1: \$2')
     }
     return val
   }
@@ -648,10 +648,10 @@ created in the route specified in the Route Name input box.
 
   if (fieldNameEl) {
     fieldNameEl.addEventListener('keyup', (event) => {
-      // console.log('fieldNameEl.addEventListener created' )
+      // vscode.postMassage({command: 'log',  text: 'fieldNameEl.addEventListener created' });
       let v = fieldNameEl.value.trim().replace(/\\bstring\\b/, 'String')
       if (!v) {
-        // console.log('field is empty' )
+        // vscode.postMassage({command: 'log',  text: 'field is empty' });
         return
       }
       v = adjustFiledNameAndType(v)
@@ -748,7 +748,7 @@ created in the route specified in the Route Name input box.
   createBtnEl.addEventListener('click', () => {
     if (routeName && fields.length) {
       const payload = { routeName, fields, embellishments: selectedCheckboxes() }
-      // vscode.postMessage({ command: 'createCrudSupport', payload: payload })
+      vscode.postMessage({ command: 'createCrudSupport', payload: payload })
     }
   })
 </script>

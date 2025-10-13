@@ -2036,6 +2036,8 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, no
       padding: 3px 1rem;
       user-select: none;
     }
+      .hidden {
+        display: none;}
   </style>
 
 </head>
@@ -2043,9 +2045,7 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, no
 <div>
   <h2 style='margin-left:8rem;'>Create CRUD Support</h2>
 
-  <div class='main-grid'>
-    <div class='grid-wrapper'>
-    <pre id='installPrismaPartOneId' class='span-two'>
+  <pre id='installPartOneId' class='hidden'>
       <h3>Prisma Installation Part One</h3>
 The Extension found that Prisma ORM is not installed in your project and it
 can help you install it. In this first part of the installation it will add all 
@@ -2053,11 +2053,11 @@ the necessary packages and initiate Prisma in this project installing a very bas
 schema in prisma/schema.prisma file at the root of the project and set a connection
 string in the .env file that it created. 
 After that it could pause waiting for you to replace prisma/schema.prisma 
-with your models/tables and set the proper connection string. It will offer you
-a continue button to enter the final commands listed below.
+with your models/tables (time consuming) and set the proper connection string. 
+It will offer you a continue button to execute the final commands listed below.
 But if you prefer to cancel the extension in order to prepare the schema and the
-connection yourself, then you would have to issue yourself the following commands 
-from a Terminal
+connection yourself, then you would have to issue yourself the above mentioned 
+commands from a Terminal
 
           pnpx prisma migrate dev --name init
           // in case of a conflict with the previous migration history, run
@@ -2067,25 +2067,26 @@ from a Terminal
           // and finally generate the Prisma client
           pnpx prisma generate
           <button id='installPartOneBtnId'>Install Prisma ORM</button><button id='cancelPartOneBtnId'>Cancel</button>
-      </pre>
+  </pre>
 
-      <pre id='installPartTwoId' class='span-two'>
+  <pre id='installPartTwoId' class='hidden'>
           <h3>Prisma Installation Part Two</h3>
-          The extension  will issue the final commands for installing Prisma
-          when you select continue, otherwise you can enter yourself the
-          commands mentioned in the Prisma Installation Part One:
+The extension  will issue the final commands for installing Prisma
+when you select continue, otherwise you can enter yourself the
+commands mentioned in the Prisma Installation Part One:
 
-              pnpx prisma migrate dev --name init
-              // in case of a conflict with the previous migration history, run
-              pnpx prisma migrate reset
-              // and repeat
-              pnpx prisma migrate dev --name init
-              // and finally generate the Prisma client
-              pnpx prisma generate
+    pnpx prisma migrate dev --name init
+    // in case of a conflict with the previous migration history, run
+    pnpx prisma migrate reset
+    // and repeat
+    pnpx prisma migrate dev --name init
+    // and finally generate the Prisma client
+    pnpx prisma generate
 
               <button id='installPartTwoBtnId'>continue</button><button id='cancelPartTwoBtnId'>cancel</button>  
       </pre>
-          
+  <div id='crudUIBlockId' class='main-grid hidden'>
+    <div class='grid-wrapper'>
       <pre class="span-two">
 To create a UI Form for CRUD operations against the underlying ORM fill
 out the <i>Candidate Fields</i> by entering field names in the <i>Field Name</i> input
@@ -2135,7 +2136,7 @@ created in the route specified in the Route Name input box.
         </div>
       </div>
     </div>
-    <div class='right-column'>
+    <div id='rightColumnId' class='right-column hidden'>
       <span class='prisma-model-caption'>Select Fields from ORM</span>
       <div id="schemaContainerId">
       </div>
@@ -2168,7 +2169,61 @@ created in the route specified in the Route Name input box.
   const vscode = acquireVsCodeApi()
   const noSchema = ${noPrismaSchema} ? true : false;
   let noSchemaText = 'based on variable noPrismaSchema got from getWebviewContent '
-  noSchemaText += ${noPrismaSchema} ? 'yes, schema found' : 'found no schema';
+  noSchemaText += ${noPrismaSchema} ? 'YES, SCHEMA FOUND' : 'FOUND NO SCHEMA';
+
+  // all the elements needed to handle Prisma installation two parts
+  // and the main CRUD support UI
+  let installPartOneEl;
+  let installPartTwoEl;
+  let installPartOneBtnEl;
+  let cancelPartOneBtnEl;
+  let installPartTwoBtnEl;
+  let cancelPartTwoBtnEl;
+  let crudUIBlockId;
+  let rightColumnEl;
+
+  window.addEventListener('load', function() {
+    vscode.postMessage({ command: 'log', text: 'WINDOW LOAD EVENT CALLED' })
+    vscode.postMessage({ command: 'log', text: noSchemaText })
+    // Code to be executed after the page and all resources are loaded
+
+    crudUIBlockEl = document.getElementById('crudUIBlockId');
+    rightColumnEl = document.getElementById('rightColumnId');
+    installPartOneEl = document.getElementById('installPartOneId');
+    installPartTwoEl = document.getElementById('installPartTwoId');
+    installPartOneBtnEl = document.getElementById('installPartOneBtnId');
+    // installPartOneBtnEl.addEventListener('click', () => {
+    //   vscode.postMessage({ command: 'installPrisma' })
+    // }
+    cancelPartOneBtnEl = document.getElementById('cancelPartOneBtnId');
+    // cancelPartOneBtnEl.addEventListener('click', () => {
+    //   vscode.postMessage({ command: 'cancel' })
+    // }
+    installPartTwoBtnEl = document.getElementById('installPartTwoBtnId');
+    // installPartTwoBtnEl.addEventListener('click', () => {
+    //   vscode.postMessage({ command: 'installPrismaPartTwo' })
+    // }
+    // cancelPartTwoBtnEl = document.getElementById('cancelPartTwoBtnId');
+    // cancelPartTwoBtnEl.addEventListener('click', () => {
+    //   vscode.postMessage({ command: 'cancel' })
+    // }
+    vscode.postMessage({ command: 'log', text:  'BEFORE TURNING PARTS VISIBLE' });
+    crudUIBlockEl.classList.remove('hidden');
+    // setTimeout(()=>{
+      // rightColumnEl.style.display = 'block';
+      rightColumnEl.classList.remove('hidden')
+    // },0)
+    if (noSchema) {
+      // all blocks start hidden
+      setTimeOut(()=>{
+        installPartOneIEl.classList.remove('hidden')
+      });
+    } else {
+      setTimeOut(()=>{
+        crudUIBlockEl.classList.remove('hidden');
+      },0);
+  }
+  });
 
   // user clicks on fields list and it should click on a field name
   // rendered in skyblue
@@ -2284,7 +2339,7 @@ created in the route specified in the Route Name input box.
   // Receive schema from the extension
   window.addEventListener("message", event => {
     vscode.postMessage({ command: 'log', text: 'got payload for renderParsedSchema()' })
-    vscode.postMessage({ command: 'log', text:  noSchemaText })
+    // vscode.postMessage({ command: 'log', text:  noSchemaText })
     const msg = event.data;
     if (msg.command === 'renderSchema') {
       renderParsedSchema(msg.payload)
