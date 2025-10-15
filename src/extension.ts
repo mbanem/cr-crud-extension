@@ -1837,14 +1837,11 @@ export async function activate(context: vscode.ExtensionContext) {
         createFormPage(includeTypes);
         buttons_();
 
-        outputChannel.appendLine(`[WebView] createCrudSupport command entry point`);
-        outputChannel.show(false);
-        // Empty body for now
-        outputChannel.appendLine(`[WebView] Received payload:', ${routeName}, ${fields.join(', ')}, ${embellishments.join(', ')}`);
-        outputChannel.show(true);
         panel.webview.postMessage({
           command: "createCrudSupportDone"
         });
+        outputChannel.appendLine(`[WebView] createCrudSupport DONE`);
+        outputChannel.show(false);
       }
       else if(msg.command === 'saveTypes'){
         const appTypesPath = path.join(rootPath as string, '/src/lib/types/');
@@ -2014,8 +2011,15 @@ function getWebviewContent(
       left: 0.5rem;
       display: inline-block;
       color: skyblue;
+      cursor:pointer;
     }
-
+    .collapse-all {
+      color:lightgreen;
+      font-size:12px;
+      border: 1px solid gray;
+      border-radius:4px;
+      padding: 2px 0 2px 1rem;
+    }
     .embellishments {
       position: relative;
       grid-column: span 2;
@@ -2170,6 +2174,16 @@ function getWebviewContent(
       user-select: none;
     }
 
+    .crud-support-done {
+      width: max-content;
+      padding: 5px 1rem;
+      margin:0;
+      color: lightgreen;
+      font-size: 14px;
+      border: 1px solid gray;
+      border-radius:5px;
+      cursor:pointer;
+    }
     .hidden {
       display: none;
     }
@@ -2236,9 +2250,10 @@ created in the route specified in the Route Name input box.
         <label for="routeNameId">Route Name
           <input id="routeNameId" type="text" />
         </label>
-        <input id="fieldNameId" type="text" value='password: string' />
+        <input id="fieldNameId" type="text" value='password: string' />FieldName
         </label>
         <button id="createBtnId" disabled>Create CRUD Support</button>
+        <div class='crud-support-done hidden'>CRUD Support Done</div>
       </div>
 
       <div class='middle-column'>
@@ -2272,7 +2287,7 @@ created in the route specified in the Route Name input box.
       </div>
     </div>
     <div id='rightColumnId' class='right-column hidden'>
-      <span class='prisma-model-caption'>Select Fields from ORM</span>
+      <span class='prisma-model-caption' onclick="closeSchemaModels()">Select Fields from ORM</span>
       <div id="schemaContainerId">
       </div>
     </div>
@@ -2298,6 +2313,8 @@ created in the route specified in the Route Name input box.
   let cancelPartTwoBtnEl
   let crudUIBlockEl
   let rightColumnEl
+  let schemaContainerEl
+  let crudSupportDoneEl
 
   window.addEventListener('load', function () {
     vscode.postMessage({ command: 'log', text: 'WINDOW LOAD EVENT CALLED' })
@@ -2310,6 +2327,8 @@ created in the route specified in the Route Name input box.
     installPartTwoBtnEl = document.getElementById('installPartTwoBtnId')
     cancelPartOneBtnEl = document.getElementById('cancelPartOneBtnId')
     cancelPartTwoBtnEl = document.getElementById('cancelPartTwoBtnId')
+    schemaContainerEl = document.getElementById('schemaContainerId')
+    crudSupportDoneEl = document.querySelector('.crud-support-done')
 
     installPartOneBtnEl.addEventListener('click', () => {
       vscode.postMessage({ command: 'installPrisma' })
@@ -2343,6 +2362,15 @@ created in the route specified in the Route Name input box.
     }
   })
 
+  function closeSchemaModels(){
+    const children = schemaContainerEl.children
+    for (let i = 0; i < children.length; i++) {
+      const det = children[i]
+      if (det.hasAttribute('open')) {
+        det.removeAttribute('open')
+      }
+    }
+  }
   // Listen for extension messages
   window.addEventListener("message", event => {
     
@@ -2352,24 +2380,32 @@ created in the route specified in the Route Name input box.
       installPartTwoEl.classList.remove('hidden');
       vscode.postMessage({command: 'log',  text: 'EXT: installPartOneDone' });
     }
-    if(msg.command === 'taskError'){
-      vscode.postMessage({command: 'log',  text: 'EXT: Prisma installation err '+ msg.error});
-    }
+    
     if (msg.command === 'installPartTwoDone'){
-      vscode.postMessage({command: 'log',  text: 'EXT: installPartTwoDone' });
+      vscode.postMessage({ command: 'log',  text: 'EXT: installPartTwoDone' });
       installPartTwoEl.classList.add('hidden');
       crudUIBlockEl.classList.remove('hidden');
       rightColumnEl.classList.remove('hidden');
       // Request schema from the active extension
       vscode.postMessage({ command: 'readSchema' })
     }
-    if (msg.command === 'createCrudSupportDone'){
-      
+    if (msg.command === 'createCrudSupportDone') {
+    vscode.postMessage({ command: 'log', text: 'EXT: createCrudSupportDone confirmed' })
+      fieldsListEl.innerHTML = ''
+      routeNameEl.value = ''
+      crudSupportDoneEl.classList.remove('hidden')
+      setTimeout(()=>{
+        crudSupportDoneEl.classList.add('hidden');
+      }, 6000)
+      closeSchemaModels();
     }
     if (msg.command === 'renderSchema') {
       vscode.postMessage({command: 'log',  text: 'EXT: renderSchema' });
       renderParsedSchema(msg.payload)
       rootPath = msg.rootPath
+    }
+    if(msg.command === 'taskError'){
+      vscode.postMessage({command: 'log',  text: 'EXT: Prisma installation err '+ msg.error});
     }
   })
 
@@ -2405,8 +2441,8 @@ created in the route specified in the Route Name input box.
   function renderParsedSchema(schemaModels) {
 
     vscode.postMessage({ command: 'log', text: 'renderParsedSchema() entry point' })
-    // get containerEl to render the schema into
-    let containerEl = document.getElementById('schemaContainerId')
+    // get schemaContainerEl to render the schema into
+    
     let markup = ''
     let types = ''
     let includeTypes = 'import type { '
@@ -2448,12 +2484,12 @@ created in the route specified in the Route Name input box.
     } catch (err) {
       vscode.postMessage({command: 'log',  text: 'renderParsedSchema: ' + err });
     }
-    // now all the markup constructed as a string render into  containerEl
-    containerEl.innerHTML = markup
+    // now all the markup constructed as a string render into  schemaContainerEl
+    schemaContainerEl.innerHTML = markup
 
-    // containerEl gets click event but it has to be from the first <p> element
+    // schemaContainerEl gets click event but it has to be from the first <p> element
     // and that fieldname (innerText) id ignored if already saved in the fields
-    containerEl.addEventListener('click', (event) => {
+    schemaContainerEl.addEventListener('click', (event) => {
 
       if (event.target.tagName === 'SUMMARY') {
         routeNameEl.value = event.target.innerText.toLowerCase()
@@ -2503,7 +2539,7 @@ created in the route specified in the Route Name input box.
   const removeHintEl = document.getElementById('removeHintId')
   removeHintEl.style.opacity = '0'    // make it as a hidden tooltip
 
-  // when a fieldsList containerEl is full scroll it so the last element
+  // when a fieldsList schemaContainerEl is full scroll it so the last element
   // is exposed visible
   const scroll = (el) => {
     if (

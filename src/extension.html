@@ -100,6 +100,7 @@
       left: 0.5rem;
       display: inline-block;
       color: navy;
+      cursor: pointer;
     }
 
     .embellishments {
@@ -296,7 +297,8 @@
       </div>
     </div>
     <div class='right-column'>
-      <span class='prisma-model-caption'>Select Fields from Prisma Model</span>
+
+      <span class='prisma-model-caption' onclick='closeAll()'>Select Fields from Prisma Model</span>
       <div id="schemaContainer">
         <pre style='font-size:12px'>
 type FieldInfo = {
@@ -342,6 +344,15 @@ type SchemaModels = {
         [modelName: string]: ModelInfo;
       };
   */
+  function closeAll() {
+    const children = document.getElementById('schemaContainer').children
+    for (let i = 0; i < children.length; i++) {
+      const det = children[i]
+      if (det.hasAttribute('open')) {
+        det.removeAttribute('open')
+      }
+    }
+  }
   let tablesModel = 'waiting for schemaModels '
   // const vscode = acquireVsCodeApi()
   function selectField(event) {
