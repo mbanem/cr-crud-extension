@@ -66,6 +66,7 @@
     // IIFE
     exportValueOn = exportValueOn.toLowerCase() as TExportValueOn;
     // make combination be with 'enter|blur' and 'keypress|blur' if inverted
+    // so the blur always follows
     const parts = exportValueOn.split('|');
     if (parts.length > 1 && parts[0] === 'blur') {
       exportValueOn = `${parts[1]}|${parts[0]}` as TExportValueOn;
@@ -74,7 +75,6 @@
   const topPosition = `${-1 * Math.floor(parseInt(fontsize) / 3)}px`;
 
   // allow pre-defined values to show up when user specify them
-  let inputValue = $state<string>('');
 
   if (browser) {
     try {
@@ -98,8 +98,8 @@
   const onBlurHandler = (event: FocusEvent) => {
     event.preventDefault();
 
-    // no entry yet so no export is ready buy is dirty -- only handle placeholder if entry is required
-    if (inputValue === '') {
+    // no entry yet so no export is ready but is dirty -- only handle placeholder if entry is required
+    if (value === '') {
       // input is required so warn the user with pink placeholder required message
       if (required) {
         inputEl.placeholder = requiredStr;
@@ -111,7 +111,6 @@
       }
     }
     if (exportValueOn.includes('blur')) {
-      value = inputValue;
       if (onInputIsReadyCallback) {
         onInputIsReadyCallback();
       }
@@ -124,23 +123,21 @@
       // NOTE: reactive variable inputbox value does not updates
       // inputbox value when changed via script, so inputEl.value
       // as a workaround is updated instead
-      inputEl.value = utils.capitalize(inputValue);
+      value = utils.capitalize(value);
     }
-    // if keypress is Enter and exportValueOn does not include Enter we return
+
     if (exportValueOn.includes('enter') && event.key !== 'Enter') {
-      if (capitalize && inputValue) {
-        // inputValue = capitalizes(inputValue);
-        inputValue = utils.capitalize(inputValue);
+      if (capitalize && value) {
+        value = utils.capitalize(value);
       }
       return;
     }
     // already prevented blur|keypress and blur|enter
     // blur always follows if any case
     if (!'keypress|blur|enter|blur'.includes(exportValueOn)) {
-      inputValue = capitalizes(inputValue);
       return;
     }
-    if (inputValue && inputValue.length > 0) {
+    if (value && value.length > 0) {
       if (capitalize) {
       }
 
@@ -150,12 +147,11 @@
         exportValueOn.includes('keypress') ||
         (exportValueOn.includes('enter') && event.key === 'Enter')
       ) {
-        value = inputValue;
 
         if (onInputIsReadyCallback) {
           onInputIsReadyCallback();
           if (clearOnInputIsReady) {
-            inputValue = '';
+            value = '';
           }
         }
       }
@@ -173,7 +169,7 @@
     inputEl.focus();
   };
 
-  // parent call to set input box value
+  // for parent call to set input box value
   export const setInputBoxValue = (str: string, blur: boolean = false) => {
     if (blur) {
       setTimeout(() => {
@@ -181,7 +177,7 @@
       }, 1000);
     }
     inputEl.focus();
-    inputValue = str;
+    value = str;
   };
   onMount(() => {
     label = document.getElementsByTagName('label')[0] as HTMLLabelElement;
@@ -193,7 +189,7 @@
     bind:this={inputEl}
     type={type ? type : 'text'}
     required
-    bind:value={inputValue}
+    bind:value
     onkeyup={onKeyUpHandler}
     onfocus={onFocusHandler}
     onblur={onBlurHandler}

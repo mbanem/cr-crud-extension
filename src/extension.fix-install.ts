@@ -5,7 +5,7 @@ import * as path from 'path';
 // to find the work folder path
 import * as child_process from 'child_process';
 
-let rootPath = '';
+let rootPath: string | undefined;
 let routeName_ ='';
 let fields_:string[]=[];
 let embellishments_:string[]=[];
@@ -15,35 +15,11 @@ let installPartTwoPending = false;
 let pm = 'unknown';
 let ex = 'unknown';
 
-const sleep = async (ms: number) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // ms here is a dummy but required by
-        // resolve to send out some value
-        resolve(ms)
-      }, ms)
-    })
-  }
 
-function createPendingFile(){
-  const pendingFile = path.join(rootPath, '/prisma/installPartTwo.pending');
-  if (!fs.existsSync(pendingFile)){
-    fs.writeFileSync(pendingFile, 'install Prisma PartOne is done.\nInstallPartTwo is pending but may be already done by User.')
-  }
-}
-function deletePendingFile(){
-  const pendingFile = path.join(rootPath, '/prisma/installPartTwo.pending');
-  if (fs.existsSync(pendingFile)){
-    fs.unlink(pendingFile, (err) => {
-      if (err) {
-        vscode.window.showInformationMessage('Could not delete installPartTwo.pending file at App Root. Delete it yourself');
-      }
-    });
-  }
-}
+
 type PMErr = { err: string };
 function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | 'bun' | PMErr  {
-  // return 'pnpm';
+  return 'pnpm';
     // const workspaceFolders = vscode.workspace.workspaceFolders;
     // if (!workspaceFolders) {
     //   return {err: 'No workspaceFolders found'};
@@ -51,12 +27,12 @@ function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | 'bun' | PMErr  {
 
     // const root = workspaceFolders[0].uri.fsPath;
 
-    if (fs.existsSync(path.join(rootPath, 'pnpm-lock.yaml'))) return pm='pnpm';
-    if (fs.existsSync(path.join(rootPath, 'yarn.lock'))) return pm='yarn';
-    if (fs.existsSync(path.join(rootPath, 'bun.lockb'))) return pm='bun';
-    if (fs.existsSync(path.join(rootPath, 'package-lock.json'))) return pm='npm';
+    // if (fs.existsSync(path.join(root, 'pnpm-lock.yaml'))) return pm='pnpm';
+    // if (fs.existsSync(path.join(root, 'yarn.lock'))) return pm='yarn';
+    // if (fs.existsSync(path.join(root, 'bun.lockb'))) return pm='bun';
+    // if (fs.existsSync(path.join(root, 'package-lock.json'))) return pm='npm';
 
-    return {err: 'unknown'};
+    // return {err: 'unknown'};
 }
 function xPackageManager(pm: string): 'npx' | 'pnpx' | 'yarn dlx' | 'bunx' | 'unknown'{
   switch(pm){
@@ -253,6 +229,7 @@ function initValues(fields_:string[]){
 }
 
 function nullType(fName:string){
+  // @ts-expect-error
   let [ , name, type] = fName.match(/(.+):\s*(\S+)/)?.map((m:string,index:number) => index===2 ? m.toLowerCase() : m);
   // fName includes type and we added | null
   if (type.includes('[]')){
@@ -1573,11 +1550,11 @@ async function findPrismaSchemaRoot(): Promise<string | null> {
         return currentPath; // ✅ Found root containing prisma/schema.prisma
       }
 
-      if (currentPath === rootPath) {
-        break; // reached project root, stop
-      }
       // Walk up to parent folder
       const parentPath = path.dirname(currentPath);
+      if (parentPath === currentPath) {
+        break; // reached filesystem root, stop
+      }
       currentPath = parentPath;
     }
   }
@@ -1666,8 +1643,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined = vscode.workspace.workspaceFolders;
   // const defaultFolderPath: string = '/home/mili/TEST/cr-crud-extension';
-  rootPath = await execShell('pwd');
-  rootPath = rootPath.replace(/\n$/,'');
+  const rootPath: string = await execShell('pwd');
   vscode.window.showErrorMessage('execShell pwd '+ rootPath);
 
   // if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -1754,31 +1730,45 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('rootPath is '+ rootPath)
         sendToTerminal(`cd ${rootPath}`)
         sendToTerminal(`${pm} install typescript ts-node @types/node -D; ${pm} i -D prisma @prisma/client; ${ex} prisma init`);
-        const prismaPath = path.join(rootPath, '/prisma/schema.prisma')
-        for (let i=0; i < 30; i++){
-          await sleep(2000)
-          if (fs.existsSync(prismaPath)){
-            break
-          }
+        const filePath = path.join(rootPath, '/prisma/schema.prisma')
+        for (let i=0; i < 10; i++){
+          setTimeout(()=>{
+            if (fs.existsSync(filePath)){
+              i=10
+            }
+          },5000)
         }
-        await sleep(2000);  // to be sure it is completed
-        createPendingFile();
-        
+        // child_process.exec(command, (error, stdout, stderr) => {
+        //   if(error){
+        //     vscode.window.showInformationMessage('Installing Prisma failed '+ error);
+        //     return
+        //   }
+        // });
+        const pendingPath = path.join(rootPath, 'installPartTwo.pending')
+        if (!fs.existsSync(pendingPath)){
+          fs.writeFileSync(pendingPath, 'install Prisma PartOne is done.\nInstallPartTwo is pending but may be already done by User.')
+        }
         panel.webview.postMessage({
           command: "installPartOneDone"
         });
       }
       else if (msg.command === 'installPrismaPartTwo'){
         vscode.window.showInformationMessage('Webview asked to install prisma part two');
-        sendToTerminal(`${ex} prisma migrate dev --name init; ${ex} prisma generate`);
-        await sleep(10000)
-        // child_process.exec(command, (error, stdout, stderr) => {
-        //   if(error){
-        //     vscode.window.showInformationMessage('Installing PrismaPartTwo failed '+ error);
-        //     return
-        //   }
-        // });
-        deletePendingFile()
+        const command = `${ex} prisma migrate dev --name init; ${ex} prisma generate`;
+        child_process.exec(command, (error, stdout, stderr) => {
+          if(error){
+            vscode.window.showInformationMessage('Installing PrismaPartTwo failed '+ error);
+            return
+          }
+        });
+        const pendingFile = path.join(rootPath, 'installPartTwo.pending');
+        if (fs.existsSync(pendingFile)){
+          fs.unlink(pendingFile, (err) => {
+            if (err) {
+              vscode.window.showInformationMessage('Could not delete installPartTwo.pending file at App Root. Delete it yourself');
+            }
+          });
+        }
         panel.webview.postMessage({
           command: "installPartTwoDone"
         });
@@ -1842,9 +1832,6 @@ export async function activate(context: vscode.ExtensionContext) {
         // Empty body for now
         outputChannel.appendLine(`[WebView] Received payload:', ${routeName}, ${fields.join(', ')}, ${embellishments.join(', ')}`);
         outputChannel.show(true);
-        panel.webview.postMessage({
-          command: "createCrudSupportDone"
-        });
       }
       else if(msg.command === 'saveTypes'){
         const appTypesPath = path.join(rootPath as string, '/src/lib/types/');
@@ -2280,6 +2267,25 @@ created in the route specified in the Route Name input box.
 </div>
 </body>
 <script>
+  /*
+    type FieldInfo = {
+      type: string;
+      prismaSetting: string; // everything after the type
+    };
+
+    // every model/table has fieldName  and fieldInfo
+    type ModelInfo = {
+      fields: {
+        [fieldName: string]: FieldInfo;
+      };
+      modelAttributes: string[]; // e.g. ["@@map(\"users\")", "@@index([email])"]
+    };
+
+    // there are many models/tables in schema.prisma
+    type SchemaModels = {
+      [modelName: string]: ModelInfo;
+    };
+  */
   let tablesModel = 'waiting for schemaModels '
   let rootPath = ''
   const vscode = acquireVsCodeApi()
@@ -2296,13 +2302,12 @@ created in the route specified in the Route Name input box.
   let cancelPartOneBtnEl
   let installPartTwoBtnEl
   let cancelPartTwoBtnEl
-  let crudUIBlockEl
+  let crudUIBlockId
   let rightColumnEl
 
   window.addEventListener('load', function () {
     vscode.postMessage({ command: 'log', text: 'WINDOW LOAD EVENT CALLED' })
 
-    crudUIBlockEl  = document.getElementById('crudUIBlockId')
     rightColumnEl = document.getElementById('rightColumnId')
     installPartOneEl = document.getElementById('installPartOneId')
     installPartTwoEl = document.getElementById('installPartTwoId')
@@ -2332,7 +2337,6 @@ created in the route specified in the Route Name input box.
       // })
     } else if (installPartTwoPending){
       installPartTwoEl.classList.remove('hidden')
-      vscode.postMessage({ command: 'log', text: 'PRISMA PART TWO INSTALLATION' })
     }
     else {
       // setTimeout(() => {
@@ -2340,36 +2344,6 @@ created in the route specified in the Route Name input box.
       rightColumnEl.classList.remove('hidden')
       vscode.postMessage({ command: 'readSchema' })
       // }, 0)
-    }
-  })
-
-  // Listen for extension messages
-  window.addEventListener("message", event => {
-    
-    const msg = event.data
-    if (msg.command === 'installPartOneDone'){
-      installPartOneEl.classList.add('hidden');
-      installPartTwoEl.classList.remove('hidden');
-      vscode.postMessage({command: 'log',  text: 'EXT: installPartOneDone' });
-    }
-    if(msg.command === 'taskError'){
-      vscode.postMessage({command: 'log',  text: 'EXT: Prisma installation err '+ msg.error});
-    }
-    if (msg.command === 'installPartTwoDone'){
-      vscode.postMessage({command: 'log',  text: 'EXT: installPartTwoDone' });
-      installPartTwoEl.classList.add('hidden');
-      crudUIBlockEl.classList.remove('hidden');
-      rightColumnEl.classList.remove('hidden');
-      // Request schema from the active extension
-      vscode.postMessage({ command: 'readSchema' })
-    }
-    if (msg.command === 'createCrudSupportDone'){
-      
-    }
-    if (msg.command === 'renderSchema') {
-      vscode.postMessage({command: 'log',  text: 'EXT: renderSchema' });
-      renderParsedSchema(msg.payload)
-      rootPath = msg.rootPath
     }
   })
 
@@ -2446,7 +2420,7 @@ created in the route specified in the Route Name input box.
   \`
       vscode.postMessage({ command: 'saveTypes', payload: types, includeTypes })
     } catch (err) {
-      vscode.postMessage({command: 'log',  text: 'renderParsedSchema: ' + err });
+      vscode.postMassage({command: 'log',  text: 'renderParsedSchema: ' + err });
     }
     // now all the markup constructed as a string render into  containerEl
     containerEl.innerHTML = markup
@@ -2465,7 +2439,7 @@ created in the route specified in the Route Name input box.
       const fieldName = el.innerText
       // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
       let type = dateTimeToDate(el.nextSibling.innerText.match(/type:(\\S+)/)?.[1])
-      vscode.postMessage({command: 'log',  text: ('clicked type', type) });
+      vscode.postMassage({command: 'log',  text: ('clicked type', type) });
       if (!'String|Number|Boolean'.includes(type)) {
         return
       }
@@ -2482,7 +2456,29 @@ created in the route specified in the Route Name input box.
   }
 
 
-
+  // Receive schema from the extension
+  window.addEventListener("message", event => {
+    vscode.postMassage({command: 'log',  text: 'got payload for renderParsedSchema()' });
+    const msg = event.data
+    if (msg.command === 'installPartOneDone'){
+      installPartOneEl.classList.add('hidden');
+      installPartTwoEl.classList.remove('hidden')
+    }
+    if(msg.command === 'taskError'){
+      vscode.postMassage({command: 'log',  text: 'Prisma installation err '+ msg.error});
+    }
+    if (msg.command === 'installPartTwoDone'){
+      installPartTwoEl.classList.add('hidden');
+      crudUIBlockId.classList.remove('hidden');
+      rightColumnEl.classList.remove('hidden');
+      // Request schema from the active extension
+      vscode.postMessage({ command: 'readSchema' })
+    }
+    if (msg.command === 'renderSchema') {
+      renderParsedSchema(msg.payload)
+      rootPath = msg.rootPath
+    }
+  })
 
   // FieldsList elements use inline style for high specificity as they are created dynamically 
   // by inserting innerHTML, so the inline style is in the listElCSS variable
@@ -2550,10 +2546,10 @@ created in the route specified in the Route Name input box.
 
   if (fieldNameEl) {
     fieldNameEl.addEventListener('keyup', (event) => {
-      // vscode.postMessage({command: 'log',  text: 'fieldNameEl.addEventListener created' });
+      // vscode.postMassage({command: 'log',  text: 'fieldNameEl.addEventListener created' });
       let v = fieldNameEl.value.trim().replace(/\\bstring\\b/, 'String')
       if (!v) {
-        // vscode.postMessage({command: 'log',  text: 'field is empty' });
+        // vscode.postMassage({command: 'log',  text: 'field is empty' });
         return
       }
       v = adjustFiledNameAndType(v)

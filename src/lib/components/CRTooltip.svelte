@@ -141,7 +141,7 @@ CRTooltip could accept the following props, though all are optional
 
   // Need to define variables as the setTooltipPos function adjusted them
   // to position properly based on preferredPos settings and available
-  // space around the hovering elements
+  // space around the hovering element
   let translateX = $state<string>('');
   let translateY = $state<string>('');
 
@@ -156,8 +156,6 @@ CRTooltip could accept the following props, though all are optional
   };
 
   let visible = $state(false);
-  // let ttRect: DOMRect | null = $state(null);
-  // let hoverRect: DOMRect | null = $state(null);
   let initial = $state(true);
 
   // the setTooltipPos examine necessary parameters for applying
@@ -211,16 +209,20 @@ CRTooltip could accept the following props, though all are optional
     // is there enough space at the right side of the screen for width and for height
     OK.topBottomRight =
       hoverRect.left - window.scrollX + tooltipRect.width < window.innerWidth;
+
     // is there enough space before the bottom side of the screen
     OK.leftRightBottom =
       hoverRect.top - window.scrollY + tooltipRect.height < window.innerHeight;
 
     OK.top =
       hoverRect.top - window.scrollY - toolbarHeight > tooltipRect.height;
+
     OK.bottom =
       hoverRect.bottom - window.scrollY + tooltipRect.height <
       window.innerHeight;
+
     OK.left = hoverRect.left - window.scrollX > tooltipRect.width;
+
     OK.right =
       hoverRect.right - window.scrollX + tooltipRect.width < window.innerWidth;
 
@@ -255,11 +257,13 @@ CRTooltip could accept the following props, though all are optional
         default:
           break;
       }
+      // if available position is found turn the tooltip on and exit teh loop
       if (translateX !== '') {
         visible = true;
         break;
       }
     }
+    // no available position was found so we improvise
     if (translateX === '') {
       translateY = OK.top
         ? `${-tooltipRect.height}px`
@@ -288,12 +292,11 @@ CRTooltip could accept the following props, though all are optional
       //   tooltipPanelId,
       // ) as HTMLElement;
 
-      // if (ttPanelWrapper) {
       if (tooltipPanelEl) {
-        // ttPanel is panel  or captionPanel to be show as a tooltip
+        // ttPanel is a panel or a captionPanel to be show as a tooltip
         const ttPanel = tooltipPanelEl.children[0] as HTMLElement;
-        // hoveringEl is the element that triggers the tooltip
 
+        // hoveringEl is the element that triggers the tooltip
         // child wrapper children are hovering elements mouseenter/mouseleave
         const hoveringEl = document.getElementById(hoveringId) as HTMLElement;
 
@@ -303,8 +306,6 @@ CRTooltip could accept the following props, though all are optional
             hoveringEl.getBoundingClientRect() as DOMRect,
             ttPanel.getBoundingClientRect() as DOMRect,
           );
-
-
         }
 
         // Clean up after logging
@@ -316,13 +317,15 @@ CRTooltip could accept the following props, though all are optional
       translateX = '0px';
       translateY = '0px';
     });
-    // }
   });
 </script>
 
 <!-- 
     NOTE: transform:translate is defined in the fade-scale and must specify
     the same left/top values as the one in this tooltipPanelEl handler
+
+    On initial===true we find dimensions of tooltip panel wrapping it via 
+    @render and then destroy wrapper after getting dimensions
 -->
 {#if initial}
   <div

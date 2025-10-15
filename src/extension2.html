@@ -279,17 +279,17 @@
 
   <pre id='installPartOneId' class='hidden'>
       <h3>Prisma Installation Part One</h3>
-The Extension found that Prisma ORM is not installed in your project and it
-can help you install it. In this first part of the installation it will add all 
-the necessary packages and initiate Prisma in this project installing a very basic
-schema in prisma/schema.prisma file at the root of the project and set a connection
+The Extension found that Prisma ORM is not installed in your project and it can
+help you install it. In this first part of the installation it will add all the
+necessary packages and initiate Prisma in this project installing a very basic
+schema in prisma/schema.prisma file at the project root and set a connection
 string in the .env file that it created. 
 After that it could pause waiting for you to replace prisma/schema.prisma 
 with your models/tables (time consuming) and set the proper connection string. 
-It will offer you a continue button to execute the final commands listed below.
-But if you prefer to cancel the extension in order to prepare the schema and the
-connection yourself, then you would have to issue yourself the above mentioned 
-commands from a Terminal
+It will offer you a continue button to execute the final commands listed below
+when you are done, though if you prefer to cancel the extension in order to prepare 
+the schema and the connection, then you would have to issue yourself the above 
+mentioned commands from a Terminal
 
           pnpx prisma migrate dev --name init
           // in case of a conflict with the previous migration history, run
@@ -399,7 +399,7 @@ created in the route specified in the Route Name input box.
   let tablesModel = 'waiting for schemaModels '
   let rootPath = ''
   // const vscode = acquireVsCodeApi()
-  const noPrismaSchema = false
+  const noPrismaSchema = true
 
   let noSchemaText = 'based on variable noPrismaSchema got from getWebviewContent ' + noPrismaSchema ? 'FOUND NO SCHEMA' : 'YES, SCHEMA FOUND'
 
@@ -411,40 +411,35 @@ created in the route specified in the Route Name input box.
   let cancelPartOneBtnEl
   let installPartTwoBtnEl
   let cancelPartTwoBtnEl
-  let crudUIBlockId
+  let crudUIBlockEl
   let rightColumnEl
 
   window.addEventListener('load', function () {
-    console.log('WINDOW LOAD EVENT CALLED')
+    // vscode.postMessage({ command: 'log', text: 'WINDOW LOAD EVENT CALLED' })
     console.log(noSchemaText)
-    // Code to be executed after the page and all resources are loaded
-
-    crudUIBlockEl = document.getElementById('crudUIBlockId')
     rightColumnEl = document.getElementById('rightColumnId')
     installPartOneEl = document.getElementById('installPartOneId')
     installPartTwoEl = document.getElementById('installPartTwoId')
     installPartOneBtnEl = document.getElementById('installPartOneBtnId')
-    // installPartOneBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'installPrisma' })
-    // }
-    cancelPartOneBtnEl = document.getElementById('cancelPartOneBtnId')
-    // cancelPartOneBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'cancel' })
-    // }
     installPartTwoBtnEl = document.getElementById('installPartTwoBtnId')
-    // installPartTwoBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'installPrismaPartTwo' })
-    // }
-    // cancelPartTwoBtnEl = document.getElementById('cancelPartTwoBtnId');
-    // cancelPartTwoBtnEl.addEventListener('click', () => {
-    //   vscode.postMessage({ command: 'cancel' })
-    // }
-    console.log('BEFORE TURNING PARTS VISIBLE')
-    // crudUIBlockEl.classList.remove('hidden')
-    // setTimeout(()=>{
-    // rightColumnEl.style.display = 'block';
-    // rightColumnEl.classList.remove('hidden')
-    // },0)
+    cancelPartOneBtnEl = document.getElementById('cancelPartOneBtnId')
+    cancelPartTwoBtnEl = document.getElementById('cancelPartTwoBtnId')
+    crudUIBlockEl = document.getElementById('crudUIBlockId')
+
+    installPartOneBtnEl.addEventListener('click', () => {
+      // vscode.postMessage({ command: 'installPrisma' })
+    })
+    cancelPartOneBtnEl.addEventListener('click', () => {
+      // vscode.postMessage({ command: 'cancel' })
+    })
+    installPartTwoBtnEl.addEventListener('click', () => {
+      // vscode.postMessage({ command: 'installPrismaPartTwo' })
+    })
+    cancelPartTwoBtnEl.addEventListener('click', () => {
+      // vscode.postMessage({ command: 'cancel' })
+    })
+    // vscode.postMessage({ command: 'log', text: 'BEFORE TURNING PARTS VISIBLE' })
+
     if (noPrismaSchema) {
       // all blocks start hidden
       // setTimeout(() => {
@@ -489,7 +484,7 @@ created in the route specified in the Route Name input box.
   // entries to be destructed into individual object properties
   function renderParsedSchema(schemaModels) {
 
-    console.log('renderParsedSchema() entry point')
+    // vscode.postMessage({ command: 'log', text: 'renderParsedSchema() entry point' })
     // get containerEl to render the schema into
     let containerEl = document.getElementById('schemaContainerId')
     let markup = ''
@@ -531,7 +526,7 @@ created in the route specified in the Route Name input box.
   `
       // vscode.postMessage({ command: 'saveTypes', payload: types, includeTypes })
     } catch (err) {
-      console.log('renderParsedSchema', err)
+      // vscode.postMessage({ command: 'log', text: 'renderParsedSchema: ' + err })
     }
     // now all the markup constructed as a string render into  containerEl
     containerEl.innerHTML = markup
@@ -550,7 +545,7 @@ created in the route specified in the Route Name input box.
       const fieldName = el.innerText
       // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
       let type = dateTimeToDate(el.nextSibling.innerText.match(/type:(\\S+)/)?.[1])
-      console.log('clicked type', type)
+      // vscode.postMessage({ command: 'log', text: ('clicked type', type) })
       if (!'String|Number|Boolean'.includes(type)) {
         return
       }
@@ -565,15 +560,18 @@ created in the route specified in the Route Name input box.
       }
     })
   }
-
   // Request schema from the active extension
   // vscode.postMessage({ command: 'readSchema' })
 
   // Receive schema from the extension
   window.addEventListener("message", event => {
-    console.log('got payload for renderParsedSchema()')
-    // console.log( noSchemaText )
+    // vscode.postMessage({ command: 'log', text: 'got payload for renderParsedSchema()' })
     const msg = event.data
+    if (msg.command === 'installPartTwoDone') {
+      installPartTwoEl.classList.add('hidden')
+      crudUIBlockId.classList.remove('hidden')
+      rightColumnEl.classList.remove('hidden')
+    }
     if (msg.command === 'renderSchema') {
       renderParsedSchema(msg.payload)
       rootPath = msg.rootPath
@@ -611,8 +609,6 @@ created in the route specified in the Route Name input box.
       }, 0)
     }
   }
-
-  // create button should be enabled when fields list is not empty
   // and the route name is specified
   const disableCreateButton = () => {
     createBtnEl.disabled = !fields.length || !routeName
@@ -648,10 +644,10 @@ created in the route specified in the Route Name input box.
 
   if (fieldNameEl) {
     fieldNameEl.addEventListener('keyup', (event) => {
-      // console.log('fieldNameEl.addEventListener created' )
+      // vscode.postMessage({command: 'log',  text: 'fieldNameEl.addEventListener created' });
       let v = fieldNameEl.value.trim().replace(/\\bstring\\b/, 'String')
       if (!v) {
-        // console.log('field is empty' )
+        // vscode.postMessage({command: 'log',  text: 'field is empty' });
         return
       }
       v = adjustFiledNameAndType(v)
@@ -672,7 +668,6 @@ created in the route specified in the Route Name input box.
       scroll(fieldsListEl)
     })
   }
-
   // we do not clear all the entries and rebuild from the fields
   // but just add a newly entered in the Field Name fieldNameId
   function renderField(fieldName) {
@@ -688,7 +683,6 @@ created in the route specified in the Route Name input box.
       })
       return name
     }
-
     // Create elements
     const div = document.createElement('div')
     const span = document.createElement('span')
