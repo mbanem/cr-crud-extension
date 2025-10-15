@@ -1766,7 +1766,7 @@ export async function activate(context: vscode.ExtensionContext) {
         
         panel.webview.postMessage({
           command: "installPartOneDone"
-        });
+        });``
       }
       else if (msg.command === 'installPrismaPartTwo'){
         vscode.window.showInformationMessage('Webview asked to install prisma part two');
@@ -1875,13 +1875,14 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`[WebView log outputChannel ${msg.text}] `);
         outputChannel.show(true); // false = don't preserve focus
       }
+      else if(msg.command === 'cancel'){
+        panel.dispose();
+      }
     });
   });
 
   context.subscriptions.push(disposable);
 }
-
-export function deactivate() {}
 
 function getWebviewContent(
   webview: vscode.Webview, 
