@@ -111,6 +111,15 @@
       left: 0.5rem;
       display: inline-block;
       color: skyblue;
+      cursor: pointer;
+    }
+
+    .collapse-all {
+      color: lightgreen;
+      font-size: 12px;
+      border: 1px solid gray;
+      border-radius: 4px;
+      padding: 2px 0 2px 1rem;
     }
 
     .embellishments {
@@ -267,6 +276,18 @@
       user-select: none;
     }
 
+    .crud-support-done {
+      width: max-content;
+      padding: 5px 2rem;
+      margin: 0 0 0 2rem;
+      color: lightgreen;
+      font-size: 14px;
+      border: 1px solid gray;
+      border-radius: 5px;
+      cursor: pointer;
+      text-align: center;
+    }
+
     .hidden {
       display: none;
     }
@@ -279,17 +300,20 @@
 
   <pre id='installPartOneId' class='hidden'>
       <h3>Prisma Installation Part One</h3>
-The Extension found that Prisma ORM is not installed in your project and it can
-help you install it. In this first part of the installation it will add all the
-necessary packages and initiate Prisma in this project installing a very basic
-schema in prisma/schema.prisma file at the project root and set a connection
-string in the .env file that it created. 
-After that it could pause waiting for you to replace prisma/schema.prisma 
-with your models/tables (time consuming) and set the proper connection string. 
-It will offer you a continue button to execute the final commands listed below
-when you are done, though if you prefer to cancel the extension in order to prepare 
-the schema and the connection, then you would have to issue yourself the above 
-mentioned commands from a Terminal
+The Extension Create CRUD Form Support found that Prisma ORM is not installed 
+in your project and it can help you install it. In this first part of the 
+installation it will add all the necessary packages and initiate Prisma in this 
+project installing a very basic schema in /prisma/schema.prisma file at the project
+root and set a connection string in the .env file that it created.
+It will open schema.prisma and .env contents in separate windows and the Extension 
+will display Prisma Installation Part Two page having a continue button waiting
+for you to 
+  1)  Specify your Prisma models/tables replacing the current schema.prisma content
+  2)  Specify connection string in the opened .env with correct connection string
+When you are done select the continue button to finis the installation with the commands
+listed below. If you closed the Extension in order to finish the above tasks you could
+issue the commands yourself or start the Extension again and it should display the
+Prisma Installation Part Two page with the continue button.
 
           pnpx prisma migrate dev --name init
           // in case of a conflict with the previous migration history, run
@@ -303,9 +327,17 @@ mentioned commands from a Terminal
 
   <pre id='installPartTwoId' class='hidden'>
           <h3>Prisma Installation Part Two</h3>
+We assume that you finished tasks 1) and 2)
+  1)  Ctrl + double-click on .env file to open it beside this Extension and
+      enter valid connection string and save the file
+  2)  Ctrl + double-click on /prisma/schema.prisma to open it beside the Extension
+      and prepare schema models/tables
+      Use model abilities for setting defaults, generating Ids,...
+      Save the model.
 The extension  will issue the final commands for installing Prisma
 when you select continue, otherwise you can enter yourself the
-commands mentioned in the Prisma Installation Part One:
+commands mentioned in the Prisma Installation Part One when 1) and 2)
+are finalized:
 
     pnpx prisma migrate dev --name init
     // in case of a conflict with the previous migration history, run
@@ -316,7 +348,8 @@ commands mentioned in the Prisma Installation Part One:
     pnpx prisma generate
 
               <button id='installPartTwoBtnId'>continue</button><button id='cancelPartTwoBtnId'>cancel</button>  
-      </pre>
+  </pre>
+
   <div id='crudUIBlockId' class='main-grid hidden'>
     <div class='grid-wrapper'>
       <pre class="span-two">
@@ -333,9 +366,11 @@ created in the route specified in the Route Name input box.
         <label for="routeNameId">Route Name
           <input id="routeNameId" type="text" />
         </label>
-        <input id="fieldNameId" type="text" value='password: string' />
+        <label for='fieldNameId'>Field Name
+          <input id="fieldNameId" type="text" value='password: string' />
         </label>
         <button id="createBtnId" disabled>Create CRUD Support</button>
+        <div class='crud-support-done hidden'>`${routeNameEl.value}` route created</div>
       </div>
 
       <div class='middle-column'>
@@ -369,7 +404,7 @@ created in the route specified in the Route Name input box.
       </div>
     </div>
     <div id='rightColumnId' class='right-column hidden'>
-      <span class='prisma-model-caption'>Select Fields from ORM</span>
+      <span class='prisma-model-caption' onclick="closeSchemaModels()">Select Fields from ORM</span>
       <div id="schemaContainerId">
       </div>
     </div>
@@ -377,32 +412,20 @@ created in the route specified in the Route Name input box.
 </div>
 </body>
 <script>
-  /*
-    type FieldInfo = {
-      type: string;
-      prismaSetting: string; // everything after the type
-    };
-
-    // every model/table has fieldName  and fieldInfo
-    type ModelInfo = {
-      fields: {
-        [fieldName: string]: FieldInfo;
-      };
-      modelAttributes: string[]; // e.g. ["@@map(\"users\")", "@@index([email])"]
-    };
-
-    // there are many models/tables in schema.prisma
-    type SchemaModels = {
-      [modelName: string]: ModelInfo;
-    };
-  */
   let tablesModel = 'waiting for schemaModels '
   let rootPath = ''
-  // const vscode = acquireVsCodeApi()
-  const noPrismaSchema = true
+  //const vscode = acquireVsCodeApi()
+  const noPrismaSchemaL = false
+  const installPartTwoPending = false
 
-  let noSchemaText = 'based on variable noPrismaSchema got from getWebviewContent ' + noPrismaSchema ? 'FOUND NO SCHEMA' : 'YES, SCHEMA FOUND'
+  let noSchemaText = 'based on variable noPrismaSchema got from getWebviewContent ' + noPrismaSchemaL ? 'FOUND NO SCHEMA' : 'YES, SCHEMA FOUND'
 
+  function installPartTwo() {
+    //   vscode.postMessage({ command: 'installPrismaPartTwo' })
+  }
+  function cancelAnyPart() {
+    //   vscode.postMessage({ command: 'cancel' })
+  }
   // all the elements needed to handle Prisma installation two parts
   // and the main CRUD support UI
   let installPartOneEl
@@ -413,10 +436,13 @@ created in the route specified in the Route Name input box.
   let cancelPartTwoBtnEl
   let crudUIBlockEl
   let rightColumnEl
+  let schemaContainerEl
+  let crudSupportDoneEl
 
   window.addEventListener('load', function () {
     // vscode.postMessage({ command: 'log', text: 'WINDOW LOAD EVENT CALLED' })
-    console.log(noSchemaText)
+
+    crudUIBlockEl = document.getElementById('crudUIBlockId')
     rightColumnEl = document.getElementById('rightColumnId')
     installPartOneEl = document.getElementById('installPartOneId')
     installPartTwoEl = document.getElementById('installPartTwoId')
@@ -424,32 +450,106 @@ created in the route specified in the Route Name input box.
     installPartTwoBtnEl = document.getElementById('installPartTwoBtnId')
     cancelPartOneBtnEl = document.getElementById('cancelPartOneBtnId')
     cancelPartTwoBtnEl = document.getElementById('cancelPartTwoBtnId')
-    crudUIBlockEl = document.getElementById('crudUIBlockId')
+    schemaContainerEl = document.getElementById('schemaContainerId')
+    crudSupportDoneEl = document.querySelector('.crud-support-done')
 
-    installPartOneBtnEl.addEventListener('click', () => {
-      // vscode.postMessage({ command: 'installPrisma' })
-    })
-    cancelPartOneBtnEl.addEventListener('click', () => {
-      // vscode.postMessage({ command: 'cancel' })
-    })
+    if (noPrismaSchemaL) {
+      installPartOneBtnEl.addEventListener('click', () => {
+        // vscode.postMessage({ command: 'installPrisma' })
+        installPartOneBtnEl.innerText = 'installing...'
+      })
+      cancelPartOneBtnEl.addEventListener('click', () => {
+        // vscode.postMessage({ command: 'cancel' })
+      })
+    }
+    if (installPartTwoPending) {
+      installPartTwoBtnEl.addEventListener('click', installPartTwo)
+      cancelPartTwoBtnEl.addEventListener('click', cancelAnyPart)
+    }
+    // vscode.postMessage({ command: 'log', text: 'BEFORE TURNING PARTS VISIBLE' })
+
+    if (noPrismaSchemaL) {
+      // all blocks start hidden
+      // setTimeout(() => {
+      installPartOneEl.classList.remove('hidden')
+      // })
+    } else if (installPartTwoPending) {
+      installPartTwoEl.classList.remove('hidden')
+      // vscode.postMessage({ command: 'log', text: 'PRISMA PART TWO INSTALLATION' })
+    }
+    else {
+      // setTimeout(() => {
+      crudUIBlockEl.classList.remove('hidden')
+      rightColumnEl.classList.remove('hidden')
+      // vscode.postMessage({ command: 'readSchema' })
+      // }, 0)
+    }
+  })
+
+  function closeSchemaModels() {
+    const children = schemaContainerEl.children
+    for (let i = 0; i < children.length; i++) {
+      const det = children[i]
+      if (det.hasAttribute('open')) {
+        det.removeAttribute('open')
+      }
+    }
+  }
+  function attachPartTwoButtons() {
+    installPartTwoBtnEl.removeEventListener('click')
     installPartTwoBtnEl.addEventListener('click', () => {
       // vscode.postMessage({ command: 'installPrismaPartTwo' })
     })
     cancelPartTwoBtnEl.addEventListener('click', () => {
       // vscode.postMessage({ command: 'cancel' })
     })
-    // vscode.postMessage({ command: 'log', text: 'BEFORE TURNING PARTS VISIBLE' })
+  }
+  let installPartOneDone = false
+  // Re-run binding when visible:
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && installPartOneDone) {
+      installPartTwoBtnEl.removeListener('click', installPartTwo)
+      cancelPartTwoBtnEl.removeListener('click', cancelAnyPart)
+      attachPartTwoButtons()
+    }
+  })
 
-    if (noPrismaSchema) {
-      // all blocks start hidden
-      // setTimeout(() => {
-      installPartOneEl.classList.remove('hidden')
-      // })
-    } else {
-      // setTimeout(() => {
+  // Listen for extension messages
+  window.addEventListener("message", event => {
+
+    const msg = event.data
+    if (msg.command === 'installPartOneDone') {
+      installPartOneDone = true
+      installPartOneEl.classList.add('hidden')
+      installPartTwoEl.classList.remove('hidden')
+      // vscode.postMessage({command: 'log',  text: 'EXT: installPartOneDone' });
+    }
+
+    if (msg.command === 'installPartTwoDone') {
+      // vscode.postMessage({ command: 'log',  text: 'EXT: installPartTwoDone' });
+      installPartTwoEl.classList.add('hidden')
       crudUIBlockEl.classList.remove('hidden')
       rightColumnEl.classList.remove('hidden')
-      // }, 0)
+      // Request schema from the active extension
+      // vscode.postMessage({ command: 'readSchema' })
+    }
+    if (msg.command === 'createCrudSupportDone') {
+      // vscode.postMessage({ command: 'log', text: 'EXT: createCrudSupportDone confirmed' })
+      fieldsListEl.innerHTML = ''
+      routeNameEl.value = ''
+      crudSupportDoneEl.classList.remove('hidden')
+      setTimeout(() => {
+        crudSupportDoneEl.classList.add('hidden')
+      }, 6000)
+      closeSchemaModels()
+    }
+    if (msg.command === 'renderSchema') {
+      // vscode.postMessage({command: 'log',  text: 'EXT: renderSchema' });
+      renderParsedSchema(msg.payload)
+      rootPath = msg.rootPath
+    }
+    if (msg.command === 'taskError') {
+      // vscode.postMessage({ command: 'log', text: 'EXT: Prisma installation err ' + msg.error })
     }
   })
 
@@ -479,14 +579,44 @@ created in the route specified in the Route Name input box.
   }
 
   let routeName = ''
+
+  function changeLabelText(id, color, text, duration) {
+    // vscode.postMessage({command:'log', text: 'changeLabelText entry point'+id})
+    // const selector = "label[for='"+ id +"']"
+    // const label = document.querySelector("label[for='routeNameId']");
+    const label = document.querySelector("label[for='" + id + "']")
+
+    // if(label){
+    //   vscode.postMessage({command:'log', text: 'querySelector FOUND label'})
+    // }else{
+    //     vscode.postMessage({command:'log', text: 'querySelector NO LABEL FOUND'})
+    // }
+    // Filter for text nodes only (excludes the <input> element)
+    const textNodes = Array.from(label.childNodes).filter(
+      (node) => node.nodeType === Node.TEXT_NODE
+    )
+
+    // Update the first (and likely only) text node
+    if (textNodes.length > 0) {
+      // save the label text
+      const nodeText = textNodes[0].textContent
+      // vscode.postMessage({command:'log', text: 'found textNode '+ nodeText})
+      textNodes[0].textContent = text
+      label.style.color = color
+      setTimeout(() => {
+        textNodes[0].textContent = nodeText
+        label.style.color = ''
+      }, 10000)
+    }
+  }
   // a parsed schema from a Prisma ORM is sent back from the extension
   // and as it is an HTML collection we turn it into an Object with
   // entries to be destructed into individual object properties
   function renderParsedSchema(schemaModels) {
 
     // vscode.postMessage({ command: 'log', text: 'renderParsedSchema() entry point' })
-    // get containerEl to render the schema into
-    let containerEl = document.getElementById('schemaContainerId')
+    // get schemaContainerEl to render the schema into
+
     let markup = ''
     let types = ''
     let includeTypes = 'import type { '
@@ -524,28 +654,29 @@ created in the route specified in the Route Name input box.
       }
       includeTypes = includeTypes.slice(0, -2) + ` }  from '$lib/types/types';
   `
-      // vscode.postMessage({ command: 'saveTypes', payload: types, includeTypes })
+      vscode.postMessage({ command: 'saveTypes', payload: types, includeTypes })
     } catch (err) {
-      // vscode.postMessage({ command: 'log', text: 'renderParsedSchema: ' + err })
+      vscode.postMessage({ command: 'log', text: 'renderParsedSchema: ' + err })
     }
-    // now all the markup constructed as a string render into  containerEl
-    containerEl.innerHTML = markup
+    // now all the markup constructed as a string render into  schemaContainerEl
+    schemaContainerEl.innerHTML = markup
 
-    // containerEl gets click event but it has to be from the first <p> element
+    // schemaContainerEl gets click event but it has to be from the first <p> element
     // and that fieldname (innerText) id ignored if already saved in the fields
-    containerEl.addEventListener('click', (event) => {
+    schemaContainerEl.addEventListener('click', (event) => {
 
       if (event.target.tagName === 'SUMMARY') {
         routeNameEl.value = event.target.innerText.toLowerCase()
         routeNameEl.focus()
         routeNameEl.click()
+        changeLabelText('routeNameId', 'pink', 'Change Route Name if necessary', 5000)
         return
       }
       const el = event.target
       const fieldName = el.innerText
       // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
       let type = dateTimeToDate(el.nextSibling.innerText.match(/type:(\\S+)/)?.[1])
-      // vscode.postMessage({ command: 'log', text: ('clicked type', type) })
+      // vscode.postMessage({command: 'log',  text: ('clicked type', type) });
       if (!'String|Number|Boolean'.includes(type)) {
         return
       }
@@ -560,23 +691,9 @@ created in the route specified in the Route Name input box.
       }
     })
   }
-  // Request schema from the active extension
-  // vscode.postMessage({ command: 'readSchema' })
 
-  // Receive schema from the extension
-  window.addEventListener("message", event => {
-    // vscode.postMessage({ command: 'log', text: 'got payload for renderParsedSchema()' })
-    const msg = event.data
-    if (msg.command === 'installPartTwoDone') {
-      installPartTwoEl.classList.add('hidden')
-      crudUIBlockId.classList.remove('hidden')
-      rightColumnEl.classList.remove('hidden')
-    }
-    if (msg.command === 'renderSchema') {
-      renderParsedSchema(msg.payload)
-      rootPath = msg.rootPath
-    }
-  })
+
+
 
   // FieldsList elements use inline style for high specificity as they are created dynamically 
   // by inserting innerHTML, so the inline style is in the listElCSS variable
@@ -597,7 +714,7 @@ created in the route specified in the Route Name input box.
   const removeHintEl = document.getElementById('removeHintId')
   removeHintEl.style.opacity = '0'    // make it as a hidden tooltip
 
-  // when a fieldsList containerEl is full scroll it so the last element
+  // when a fieldsList schemaContainerEl is full scroll it so the last element
   // is exposed visible
   const scroll = (el) => {
     if (
@@ -742,7 +859,7 @@ created in the route specified in the Route Name input box.
   createBtnEl.addEventListener('click', () => {
     if (routeName && fields.length) {
       const payload = { routeName, fields, embellishments: selectedCheckboxes() }
-      // vscode.postMessage({ command: 'createCrudSupport', payload: payload })
+      vscode.postMessage({ command: 'createCrudSupport', payload: payload })
     }
   })
 </script>

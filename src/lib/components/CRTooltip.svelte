@@ -420,6 +420,7 @@ CRTooltip could accept the following props, though all are optional
     outline: none;
   }
   .caption-default {
+    display: inline-block;
     border: 6px solid skyblue;
     border-radius: 5px;
     color: yellow;

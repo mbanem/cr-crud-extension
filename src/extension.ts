@@ -15,6 +15,40 @@ let installPartTwoPending = false;
 let pm = 'unknown';
 let ex = 'unknown';
 
+const schemaWhatToDo = `/*
+MAKE YOUR PRISMA SCHEMA MODELS HERE
+As databases could have stronger requests for naming tables and columns
+use Prisma modification operators for renaming TypeScript model names
+into new database names like
+    model User {
+      id      			String   @id @default(uuid())
+      firstName    	String   @map("first_name")
+      createdAt DateTime @default(now())   @map("created_at")
+      @@map("users")
+    }
+Now in your program you use firstName but in db it is the first_name
+and the table in program is User but in db users thanks to the operators
+@map first_name and @@map users, as some db have
+internal user table so we use plural instead.
+*/`
+
+const envWhatToDo = `# Environment variables declared in this file are automatically made available to Prisma.
+# See the documentation for more detail: https://pris.ly/d/prisma-schema#accessing-environment-variables-from-the-schema
+
+# Prisma supports the native connection string format for PostgreSQL, MySQL, SQLite, SQL Server, MongoDB and CockroachDB.
+# See the documentation for all the connection string options: https://pris.ly/d/connection-strings
+
+# example is for PostgreSQL, change values wrapped in < >
+# <username> is a Role in PostgreSQL
+# <password> is username's db password
+# <dbName> is database name to connect to
+DATABASE_URL="postgresql://<username>:<password>@localhost:5432/<dbName>?schema=public"
+
+# see docs for how to use SECRET_API_KEYs
+SECRET_APT_KEY="kiki:kiki@localhost:5432
+SECRET_APT_ENV=development
+SECRET_API_KEY=1234567890`;
+
 const sleep = async (ms: number) => {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -43,13 +77,6 @@ function deletePendingFile(){
 }
 type PMErr = { err: string };
 function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | 'bun' | PMErr  {
-  // return 'pnpm';
-    // const workspaceFolders = vscode.workspace.workspaceFolders;
-    // if (!workspaceFolders) {
-    //   return {err: 'No workspaceFolders found'};
-    // }
-
-    // const root = workspaceFolders[0].uri.fsPath;
 
     if (fs.existsSync(path.join(rootPath, 'pnpm-lock.yaml'))) return pm='pnpm';
     if (fs.existsSync(path.join(rootPath, 'yarn.lock'))) return pm='yarn';
@@ -263,14 +290,15 @@ function nullType(fName:string){
 }
 let importTypes = 'import type {';
 function createFormPage(includeTypes: string){
-  const pPagePath = path.join(rootPath as string, `/src/routes/${routeName_}`);
-  if (!fs.existsSync(pPagePath)) {
-    fs.mkdirSync(pPagePath, { recursive: true });
+  const plusPageSveltePath = path.join(rootPath as string, `/src/routes/${routeName_}`);
+  
+  if (!fs.existsSync(plusPageSveltePath)) {
+    fs.mkdirSync(plusPageSveltePath, { recursive: true });
   }
     let TFormData = `type TFormData = {
-    `
-    let inputBoxes = '';
-  
+      `
+      let inputBoxes = '';
+      
     
     let snap = `
   let snap = $state<TFormData>({
@@ -286,27 +314,27 @@ function createFormPage(includeTypes: string){
   let imports= ''
   embellishments_.forEach(comp => {
     imports += `import ${comp} from '$lib/components/${comp}.svelte';
-  `
-  })
-  let markup = `<script lang="ts">
-  import type { Snapshot } from '../$types';
-  import { onMount } from 'svelte';
-  import type { PageData, ActionData } from './$types';
-  import type { SubmitFunction } from '@sveltejs/kit';
-  import { enhance } from '$app/forms';
-  import { invalidateAll } from '$app/navigation';
-  import { page } from '$app/state'; // for page.status code on actions
+`
+})
+let plusPageSvelte = `<script lang="ts">
+import type { Snapshot } from '../$types';
+import { onMount } from 'svelte';
+import type { PageData, ActionData } from './$types';
+import type { SubmitFunction } from '@sveltejs/kit';
+import { enhance } from '$app/forms';
+import { invalidateAll } from '$app/navigation';
+import { page } from '$app/state'; // for page.status code on actions
 
-  import * as utils from '$lib/utils';
-  ` + imports
-    + includeTypes
-    + TFormData.replace(/\?/g, '') + `
-  };` + snap + 
+import * as utils from '$lib/utils';
+` + imports
++ includeTypes
++ TFormData.replace(/\?/g, '') + `
+};` + snap + 
 `});
 
-  type ARGS = {
-    data: PageData;
-    form: ActionData;
+type ARGS = {
+  data: PageData;
+  form: ActionData;
   };
   let { data, form }: ARGS = $props();
   let loading = $state<boolean>(false); // toggling the spinner
@@ -320,41 +348,17 @@ function createFormPage(includeTypes: string){
       result = '';
     }, 2000);
   };
-
-  // TODO: try to find out where to implement delete icon
-  // and the following snippets
-  /*
-    <span
-      bind:this={iconDelete}
-      onclick={() => {
-        btnDelete.click();
-      }}
-      aria-hidden={true}
-      ><span class="icon-delete" class:pink={wrongUser}>X</span></span
-    >
-    {@render deleteIcon()}
-
-    {#snippet deleteIcon()}
-      !-- <Tooltip class="tooltip-profile"> --
-      <p>delete the profile</p>
-      !-- </Tooltip> --
-    {/snippet}
-    {#snippet ownerOnly()}
-      !-- <Tooltip class="tooltip-profile"> --
-      <p class="pink">Owner only permission</p>
-      !-- </Tooltip> --
-    {/snippet}
-  */
+      
   const capitalize = (str:string) => {
     const spaceUpper = (su:string) => {
       return \` \${su[1]?.toUpperCase()}\`
     }
-    
+          
     return str
     .replace(/(_\\w)/, spaceUpper)
     .replace(/\\b[a-z](?=[a-z]{2})/g, (char) => char.toUpperCase())
   }
-
+  
   function noType(name: string){
     return name.match(/([a-zA-z0-9_]+)\:?.*/)?.[1]
   }
@@ -363,7 +367,7 @@ function createFormPage(includeTypes: string){
   const nullSnap = {
     ${clean_snap}
   }
-
+      
   let formDataValid = $derived.by(() => {
     for (const [key, value] of Object.entries(snap)) {
       if (key === 'id') continue;
@@ -371,13 +375,13 @@ function createFormPage(includeTypes: string){
     }
     return true;
   });
-
+      
   const clearForm = (event?: MouseEvent | KeyboardEvent) => {
     event?.preventDefault();
     snap = nullSnap;
     utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
   };` + `
-  
+    
   const enhanceSubmit: SubmitFunction = async ({ action, formData }) => {
     const required:string[] = [];
     for (const [key, value] of Object.entries(snap)) {
@@ -391,25 +395,25 @@ function createFormPage(includeTypes: string){
         }
       }
     }  
-
+          
     if (required.join('').length){
       return;
     }
     loading = true; // start spinner animation
-
+      
     result =
       action.search === '?/create'
-        ? 'creating \`\${routeName}\`...'
-        : action.search === '?/update'
-          ? 'updating \`\${routeName}\`...'
-          : 'deleting \`\${routeName}\`...';
+      ? 'creating \`\${routeName}\`...'
+      : action.search === '?/update'
+      ? 'updating \`\${routeName}\`...'
+      : 'deleting \`\${routeName}\`...';
     if (action.search === '?/delete') {
       utils.hideButtonsExceptFirst([btnDelete, btnCreate, btnUpdate]);
     }
-
+      
     return async ({ update }) => {
       await update();
-
+        
       if (action.search === '?/create') {
         result = page.status === 200 ? '\`\${routeName}\` created' : 'create failed';
       } else if (action.search === '?/update') {
@@ -425,20 +429,54 @@ function createFormPage(includeTypes: string){
       clearForm();
       utils.hideButtonsExceptFirst([btnCreate, btnUpdate, btnDelete]);
       clearMessage();
-  }
+    }
 
-  ${buttons_()}
-  }
-</script>
-<form action="?/create" method="post" use:enhance={enhanceSubmit}>
-  <div class='form-wrapper'>
-    ${inputBoxes}
-    <div class='buttons-row'>
-      ${buttons}<button onclick={clearForm}>clear form</button>
+    ${buttons_()}
+    }
+    let owner = true;
+  </script>
+
+  {#snippet deleteIcon(owner:boolean)}
+    {#if owner}
+      <CRTooltip caption='delete the item'>
+        <span
+          onclick={() => {
+          btnDelete.click();
+          aria-hidden={true}
+          class="icon-delete"
+          style:cursor={owner ? 'pointer': 'not-allowed'}
+        >
+          X
+        </span>
+      </CRTooltip>
+    {:else}
+      <CRTooltip caption='delete the item'>
+        <span
+          class="icon-delete pink"
+          style:cursor={owner ? 'pointer': 'not-allowed'}
+        >
+          X
+        </span>
+      </CRTooltip>
+    {/if}
+  {/snippet}
+      
+  <form action="?/create" method="post" use:enhance={enhanceSubmit}>
+    <div class='form-wrapper'>
+      ${inputBoxes}
+      <div class='buttons-row'>
+        ${buttons}<button onclick={clearForm}>clear form</button>
+      </div>
     </div>
-    </div>
-  </div>
-</form>
+  </form>
+<pre>How to use deleteIcon an HTMLSpanElement
+The delete icon X has to be rendered via render deleteIcon(true/false)
+inside a list elements item meant to be deleted specifying a boolean
+which when true allows deletion  but when false show not-allowed pointer
+and a tooltip 'owner permission'
+</pre>
+
+<div style='border:0;padding:0'>This is a list item to be deleted{@render deleteIcon(true)}</div>
 <style lang='scss'>
   .form-wrapper {
     display: flex;
@@ -460,56 +498,70 @@ function createFormPage(includeTypes: string){
       }
     }
   }
+  .icon-delete{
+    display: inline-block;
+    width: max-content;
+    padding: 3px 8px;
+    border: 1px solid gray;
+    border-radius: 4px;
+  }
+  .pink{
+    color: pink;
+  }
+  CRTooltip:has(> span) {
+    display: flex;
+    align-items: baseline;
+  }
 </style>
-  `
-  const filePath = path.join(pPagePath as string, '+page.svelte');
-  fs.writeFileSync(filePath, markup, 'utf8');
+`
+  const filePath = path.join(plusPageSveltePath as string, '+page.svelte');
+  fs.writeFileSync(filePath, plusPageSvelte, 'utf8');
 }
-function createUtils(routeName:String, fields:string[]) {
-
-  const utils = `export const sleep = async (ms: number) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // ms here is a dummy but required by
-        // resolve to send out some value
-        resolve(ms)
-      }, ms)
-    })
-  }
+// function createUtils(routeName:String, fields:string[]) {
   
-  export const resetButtons = (buttons: HTMLButtonElement[]) => {
-    try {
-      buttons.forEach((btn) => {
-        btn.classList.remove('hidden')
-        btn.classList.add('hidden')
-        try {
-          btn.hidden = true
-        } finally {
-        }
-      })
-    } catch { }
-  }
-`;
+//   const utils = `export const sleep = async (ms: number) => {
+  //     return new Promise((resolve) => {
+    //       setTimeout(() => {
+      //         // ms here is a dummy but required by
+      //         // resolve to send out some value
+//         resolve(ms)
+//       }, ms)
+//     })
+//   }
+  
+//   export const resetButtons = (buttons: HTMLButtonElement[]) => {
+//     try {
+//       buttons.forEach((btn) => {
+//         btn.classList.remove('hidden')
+//         btn.classList.add('hidden')
+//         try {
+//           btn.hidden = true
+//         } finally {
+//         }
+//       })
+//     } catch { }
+//   }
+// `;
 
-  const utilsPath = path.join(rootPath as string, '/src/lib/utils');
-  if (!fs.existsSync(utilsPath)) {
-    fs.mkdirSync(utilsPath, { recursive: true });
-  }
-  let filePath = path.join(utilsPath, 'crHelpers.ts')
-  fs.writeFileSync(filePath, utils, 'utf8');
+//   const utilsPath = path.join(rootPath as string, '/src/lib/utils');
+//   if (!fs.existsSync(utilsPath)) {
+//     fs.mkdirSync(utilsPath, { recursive: true });
+//   }
+//   let filePath = path.join(utilsPath, 'crHelpers.ts')
+//   fs.writeFileSync(filePath, utils, 'utf8');
 
-  const content = "export * from '/home/mili/TEST/cr-crud-extension/src/lib/utils/crHelpers';";
-  filePath = path.join(utilsPath, 'index.ts');
-  if (!fs.existsSync(filePath)){
-    fs.writeFileSync(filePath, content, 'utf8');
-  } else {
-    // check if crHelpers are exported from /utils/index.ts
-    const exports = fs.readFileSync(filePath, 'utf8');
-    if (!exports.includes('crHelpers')){
-      fs.appendFileSync(filePath, content, 'utf8');
-    }
-  }
-}
+//   const content = "export * from '/home/mili/TEST/cr-crud-extension/src/lib/utils/crHelpers';";
+//   filePath = path.join(utilsPath, 'index.ts');
+//   if (!fs.existsSync(filePath)){
+//     fs.writeFileSync(filePath, content, 'utf8');
+//   } else {
+//     // check if crHelpers are exported from /utils/index.ts
+//     const exports = fs.readFileSync(filePath, 'utf8');
+//     if (!exports.includes('crHelpers')){
+//       fs.appendFileSync(filePath, content, 'utf8');
+//     }
+//   }
+// }
 
 function createCRInput(){
   const componentsPath = ensureComponentPath()
@@ -1668,6 +1720,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // const defaultFolderPath: string = '/home/mili/TEST/cr-crud-extension';
   rootPath = await execShell('pwd');
   rootPath = rootPath.replace(/\n$/,'');
+  vscode.window.showInformationMessage('rootPath ' + rootPath)
   vscode.window.showErrorMessage('execShell pwd '+ rootPath);
 
   // if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -1694,14 +1747,22 @@ export async function activate(context: vscode.ExtensionContext) {
   // Create output channel for webview logs
   const outputChannel = vscode.window.createOutputChannel('WebView Logs');
 
-  // BANE
+
   const prismaSchemaRoot = await findPrismaSchemaRoot();
   if (!prismaSchemaRoot){
     noPrismaSchema = true;
   }
 
-  let pendingFile = path.join(rootPath, 'installPartTwo.pending')
+  // let pendingFile = vscode.Uri.file(path.join(rootPath, '/prisma/installPartTwo.pending'));
+  let pendingFile = path.join(rootPath, '/prisma/installPartTwo.pending');
   installPartTwoPending = fs.existsSync(pendingFile)
+  // try {
+  //   await vscode.workspace.fs.stat(pendingFile);
+  //   installPartTwoPending = true;
+  //   // File exists – proceed with Part Two logic
+  // } finally {
+  //   // File missing
+  // }
   // vscode.debug.onDidStartDebugSession(session => {
   //   outputChannel.appendLine(`onDidStartDebugSession activated`);
   //   outputChannel.show(true);
@@ -1723,7 +1784,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // register Create CRUD Support 
   const disposable = vscode.commands.registerCommand('cr-crud-extension.createCrudSupport', () => {
     
-    // NOTE: Toe show workspaceFolders uncomment lines below
+    // NOTE: To show workspaceFolders uncomment the lines below
     // const workspaceFolders = vscode.workspace.workspaceFolders;
     // outputChannel.appendLine(`workspaceFolders', ${JSON.stringify(workspaceFolders,null,2)}`)
     // outputChannel.show(true);
@@ -1732,26 +1793,29 @@ export async function activate(context: vscode.ExtensionContext) {
       'crCrudSupport',
       'Create CRUD Form Support',
       vscode.ViewColumn.One,
-      { enableScripts: true }
+      { enableScripts: true,
+        retainContextWhenHidden: true
+      }
     );
 
     let includeTypes = ''
     if (noPrismaSchema){
       vscode.window.showInformationMessage('EXT: NO PRISMA SCHEMA FOUND');
     }
+    // vscode.window.showInformationMessage('EXT: rootPath == '+ rootPath),
     // const nonce = getNonce();
     panel.webview.html = getWebviewContent(panel.webview, context.extensionUri, noPrismaSchema, installPartTwoPending);
 
     panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.command === 'installPrisma'){
-        vscode.window.showInformationMessage('Webview asked to install Prisma');
+        // vscode.window.showInformationMessage('Webview asked to install Prisma');
         const pm = detectPackageManager();
         if (typeof pm === 'object'){
           vscode.window.showInformationMessage('detectPackageManager err:'+ pm.err);
         }else{
           xPackageManager(pm);
         }
-        vscode.window.showInformationMessage('rootPath is '+ rootPath)
+        // vscode.window.showInformationMessage('rootPath is '+ rootPath)
         sendToTerminal(`cd ${rootPath}`)
         sendToTerminal(`${pm} install typescript ts-node @types/node -D; ${pm} i -D prisma @prisma/client; ${ex} prisma init`);
         const prismaPath = path.join(rootPath, '/prisma/schema.prisma')
@@ -1766,10 +1830,74 @@ export async function activate(context: vscode.ExtensionContext) {
         
         panel.webview.postMessage({
           command: "installPartOneDone"
-        });``
+        });
+        await sleep(2000)
+        // panel.dispose()
+
+// read created /prisma/schema.prisma and display it in a new Tab
+        try {
+          // Get workspace root (assume first folder)
+          const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+          if (!workspaceFolder) {
+            vscode.window.showErrorMessage('No workspace folder open');
+            return;
+          }
+
+          // Construct absolute file path
+          const schemaPath = path.join(workspaceFolder.uri.fsPath, '/prisma/schema.prisma');
+          if (!fs.existsSync(schemaPath)){
+            fs.writeFileSync(schemaPath, '', 'utf8')
+          }
+            fs.appendFileSync(schemaPath, schemaWhatToDo, 'utf8');
+            // Create path for the file
+            let uri = vscode.Uri.file(schemaPath);
+            // Open in a new tab (beside current editor)
+            await vscode.window.showTextDocument(uri, { 
+              viewColumn: vscode.ViewColumn.Beside, // Opens beside active editor
+              preview: false // Optional: Force a new tab (not preview mode)
+            });
+            
+            const envPath = path.join(rootPath, '/.env');
+            uri = vscode.Uri.file(envPath);
+            if (!fs.existsSync(envPath)){
+              fs.writeFileSync(envPath, envWhatToDo, 'utf8')
+            }
+            await vscode.window.showTextDocument(uri, { 
+                viewColumn: vscode.ViewColumn.Beside, // Opens beside active editor
+                preview: false // Optional: Force a new tab (not preview mode)
+            });
+
+            // This does not work
+            // // Save progress
+            // context.workspaceState.update('installStep', 'installPartOneDone');
+
+            // // Retrieve when focusing again
+            // const step = context.workspaceState.get('installStep');
+            // panel.webview.postMessage({ step });
+
+            // panel.onDidChangeViewState(e => {
+            //   // Retrieve when focusing again
+            //   if (e.webviewPanel.active) {
+            //     panel.webview.postMessage({ command: 'installPartOneDone' });
+            //   }else{
+            //     const step = context.workspaceState.get('installStep');
+            //     panel.webview.postMessage({ command: 'installPartOneDone' });
+            //   }
+            // });
+        } catch (error) {
+            // Handle errors (e.g., file not found)
+            console.error('Failed to open file:', error);
+            panel.webview.postMessage({
+                command: 'fileError',
+                error: (error as Error).message
+            });
+        }
+
+
+
       }
       else if (msg.command === 'installPrismaPartTwo'){
-        vscode.window.showInformationMessage('Webview asked to install prisma part two');
+        // vscode.window.showInformationMessage('Webview asked to install prisma part two');
         sendToTerminal(`${ex} prisma migrate dev --name init; ${ex} prisma generate`);
         await sleep(10000)
         // child_process.exec(command, (error, stdout, stderr) => {
@@ -1812,13 +1940,26 @@ export async function activate(context: vscode.ExtensionContext) {
           fields: string[];
           embellishments:string[];
         };
+
+        const plusPageSveltePath = path.join(rootPath as string, `/src/routes/${routeName}`);
+        const filePath = path.join(plusPageSveltePath, '/+page.svelte');
+        if (fs.existsSync(filePath)){
+          const answer = await vscode.window.showWarningMessage(
+            'There is a route with this name. To overwrite it?',
+            'Yes',
+            'No'
+          );
+          if(answer === 'No'){
+            return
+          }
+        }
         type FuncList = {
           [funcName: string]: Function;
         };
         routeName_ = routeName;
         fields_= fields;
         embellishments_ = embellishments;
-        createUtils(routeName, fields);
+        // createUtils(routeName, fields);
         const funcList: FuncList = {
           'CRInput': createCRInput,
           'CRSpinner':createCRSpinner,
@@ -1896,7 +2037,7 @@ function getWebviewContent(
     localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
   };
 
-  vscode.window.showInformationMessage('Bane getWebviewContent vscode.Uri!');
+  // vscode.window.showInformationMessage('EXT: installPartTwoPending ' + installPartTwoPending);
   
   // returns a working HTML page that creates UI Form page with CRUD support
   return `<!DOCTYPE html>
@@ -1930,13 +2071,9 @@ function getWebviewContent(
     #createBtnId {
       width: 12rem;
       padding: 4px 0;
-      margin: 1rem 0 0 0;
+      margin: 2rem 0 0 0;
       padding: 5px 0;
       opacity: 0.8;
-    }
-
-    #createBtnId {
-      margin-left: 2rem;
     }
 
     #createBtnId:hover {
@@ -2177,13 +2314,14 @@ function getWebviewContent(
 
     .crud-support-done {
       width: max-content;
-      padding: 5px 1rem;
-      margin:0;
+      padding: 5px 2rem;
+      margin:1rem 0 0 0;
       color: lightgreen;
       font-size: 14px;
       border: 1px solid gray;
       border-radius:5px;
       cursor:pointer;
+      text-align: center;
     }
     .hidden {
       display: none;
@@ -2197,17 +2335,20 @@ function getWebviewContent(
 
   <pre id='installPartOneId' class='hidden'>
       <h3>Prisma Installation Part One</h3>
-The Extension found that Prisma ORM is not installed in your project and it can
-help you install it. In this first part of the installation it will add all the
-necessary packages and initiate Prisma in this project installing a very basic
-schema in prisma/schema.prisma file at the project root and set a connection
-string in the .env file that it created. 
-After that it could pause waiting for you to replace prisma/schema.prisma 
-with your models/tables (time consuming) and set the proper connection string. 
-It will offer you a continue button to execute the final commands listed below
-when you are done, though if you prefer to cancel the extension in order to prepare 
-the schema and the connection, then you would have to issue yourself the above 
-mentioned commands from a Terminal
+The Extension Create CRUD Form Support found that Prisma ORM is not installed 
+in your project and it can help you install it. In this first part of the 
+installation it will add all the necessary packages and initiate Prisma in this 
+project installing a very basic schema in /prisma/schema.prisma file at the project
+root and set a connection string in the .env file that it created.
+It will open schema.prisma and .env contents in separate windows and the Extension 
+will display Prisma Installation Part Two page having a continue button waiting
+for you to 
+  1)  Specify your Prisma models/tables replacing the current schema.prisma content
+  2)  Specify connection string in the opened .env with correct connection string
+When you are done select the continue button to finis the installation with the commands
+listed below. If you closed the Extension in order to finish the above tasks you could
+issue the commands yourself or start the Extension again and it should display the
+Prisma Installation Part Two page with the continue button.
 
           pnpx prisma migrate dev --name init
           // in case of a conflict with the previous migration history, run
@@ -2221,9 +2362,17 @@ mentioned commands from a Terminal
 
   <pre id='installPartTwoId' class='hidden'>
           <h3>Prisma Installation Part Two</h3>
+We assume that you finished tasks 1) and 2)
+  1)  Ctrl + double-click on .env file to open it beside this Extension and
+      enter valid connection string and save the file
+  2)  Ctrl + double-click on /prisma/schema.prisma to open it beside the Extension
+      and prepare schema models/tables
+      Use model abilities for setting defaults, generating Ids,...
+      Save the model.
 The extension  will issue the final commands for installing Prisma
 when you select continue, otherwise you can enter yourself the
-commands mentioned in the Prisma Installation Part One:
+commands mentioned in the Prisma Installation Part One when 1) and 2)
+are finalized:
 
     pnpx prisma migrate dev --name init
     // in case of a conflict with the previous migration history, run
@@ -2234,7 +2383,8 @@ commands mentioned in the Prisma Installation Part One:
     pnpx prisma generate
 
               <button id='installPartTwoBtnId'>continue</button><button id='cancelPartTwoBtnId'>cancel</button>  
-      </pre>
+  </pre>
+
   <div id='crudUIBlockId' class='main-grid hidden'>
     <div class='grid-wrapper'>
       <pre class="span-two">
@@ -2251,10 +2401,11 @@ created in the route specified in the Route Name input box.
         <label for="routeNameId">Route Name
           <input id="routeNameId" type="text" />
         </label>
-        <input id="fieldNameId" type="text" value='password: string' />FieldName
+        <label for='fieldNameId'>Field Name
+          <input id="fieldNameId" type="text" value='password: string' />
         </label>
         <button id="createBtnId" disabled>Create CRUD Support</button>
-        <div class='crud-support-done hidden'>CRUD Support Done</div>
+        <div class='crud-support-done hidden'></div>
       </div>
 
       <div class='middle-column'>
@@ -2304,6 +2455,12 @@ created in the route specified in the Route Name input box.
 
   let noSchemaText = 'based on variable noPrismaSchema got from getWebviewContent ' + noPrismaSchemaL ? 'FOUND NO SCHEMA' : 'YES, SCHEMA FOUND'
 
+  function installPartTwo() {
+    vscode.postMessage({ command: 'installPrismaPartTwo' })
+  }
+  function cancelAnyPart() {
+    vscode.postMessage({ command: 'cancel' })
+  }
   // all the elements needed to handle Prisma installation two parts
   // and the main CRUD support UI
   let installPartOneEl
@@ -2317,8 +2474,12 @@ created in the route specified in the Route Name input box.
   let schemaContainerEl
   let crudSupportDoneEl
 
+  // Fires only one time
+  // based on two variables noPrismaSchemaL and installPartTwoPending
+  // prepare event listeners or if both are false make main page visible
+  // This is how extension starts
   window.addEventListener('load', function () {
-    vscode.postMessage({ command: 'log', text: 'WINDOW LOAD EVENT CALLED' })
+    // vscode.postMessage({ command: 'log', text: 'WINDOW LOAD EVENT CALLED' })
 
     crudUIBlockEl  = document.getElementById('crudUIBlockId')
     rightColumnEl = document.getElementById('rightColumnId')
@@ -2331,30 +2492,36 @@ created in the route specified in the Route Name input box.
     schemaContainerEl = document.getElementById('schemaContainerId')
     crudSupportDoneEl = document.querySelector('.crud-support-done')
 
-    installPartOneBtnEl.addEventListener('click', () => {
-      vscode.postMessage({ command: 'installPrisma' })
-    })
-    cancelPartOneBtnEl.addEventListener('click', () => {
-      vscode.postMessage({ command: 'cancel' })
-    })
-    installPartTwoBtnEl.addEventListener('click', () => {
-      vscode.postMessage({ command: 'installPrismaPartTwo' })
-    })
-    cancelPartTwoBtnEl.addEventListener('click', () => {
-      vscode.postMessage({ command: 'cancel' })
-    })
-    vscode.postMessage({ command: 'log', text: 'BEFORE TURNING PARTS VISIBLE' })
+    if (noPrismaSchemaL){
+      installPartOneBtnEl.addEventListener('click', () => {
+        vscode.postMessage({ command: 'installPrisma' })
+        installPartOneBtnEl.innerText = 'installing...'
+      })
+      cancelPartOneBtnEl.addEventListener('click', () => {
+        vscode.postMessage({ command: 'cancel' })
+      })
+      // fires once so be ready it extension waits for schema and connection
+      installPartTwoBtnEl.addEventListener('click', installPartTwo)
+      cancelPartTwoBtnEl.addEventListener('click', cancelAnyPart)
+    }
+    if (installPartTwoPending){
+      installPartTwoBtnEl.addEventListener('click', installPartTwo)
+      cancelPartTwoBtnEl.addEventListener('click', cancelAnyPart)
+    }
+    // vscode.postMessage({ command: 'log', text: 'BEFORE TURNING PARTS VISIBLE' })
 
     if (noPrismaSchemaL) {
+      console.log('console.log -- noPrismaSchemaL')
       // all blocks start hidden
-      // setTimeout(() => {
       installPartOneEl.classList.remove('hidden')
-      // })
-    } else if (installPartTwoPending){
+    } 
+    else if (installPartTwoPending){
+      console.log('console.log -- installPartTwoPending')
       installPartTwoEl.classList.remove('hidden')
-      vscode.postMessage({ command: 'log', text: 'PRISMA PART TWO INSTALLATION' })
+      // vscode.postMessage({ command: 'log', text: 'PRISMA PART TWO INSTALLATION' })
     }
     else {
+      console.log('console.log -- Create CRUD Support')
       // setTimeout(() => {
       crudUIBlockEl.classList.remove('hidden')
       rightColumnEl.classList.remove('hidden')
@@ -2362,6 +2529,7 @@ created in the route specified in the Route Name input box.
       // }, 0)
     }
   })
+
 
   function closeSchemaModels(){
     const children = schemaContainerEl.children
@@ -2371,19 +2539,42 @@ created in the route specified in the Route Name input box.
         det.removeAttribute('open')
       }
     }
+    fields = []
+    fieldNameEl.value = 'password: string'
   }
+  function attachPartTwoButtons() {
+    installPartTwoBtnEl.removeEventListener('click')
+    installPartTwoBtnEl.addEventListener('click', () => {
+        vscode.postMessage({ command: 'installPrismaPartTwo' })
+      })
+      cancelPartTwoBtnEl.addEventListener('click', () => {
+        vscode.postMessage({ command: 'cancel' })
+      })
+  }
+  let installPartOneDone = false;
+  // Re-run binding when visible:
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && installPartOneDone) {
+      installPartTwoBtnEl.removeListener('click', installPartTwo);
+      cancelPartTwoBtnEl.removeListener('click', cancelAnyPart);
+      attachPartTwoButtons();
+    }
+  });
+
   // Listen for extension messages
   window.addEventListener("message", event => {
     
     const msg = event.data
     if (msg.command === 'installPartOneDone'){
+      installPartOneDone = true;
       installPartOneEl.classList.add('hidden');
+      // event handlers are already established
       installPartTwoEl.classList.remove('hidden');
-      vscode.postMessage({command: 'log',  text: 'EXT: installPartOneDone' });
+      // vscode.postMessage({command: 'log',  text: 'EXT: installPartOneDone' });
     }
     
     if (msg.command === 'installPartTwoDone'){
-      vscode.postMessage({ command: 'log',  text: 'EXT: installPartTwoDone' });
+      // vscode.postMessage({ command: 'log',  text: 'EXT: installPartTwoDone' });
       installPartTwoEl.classList.add('hidden');
       crudUIBlockEl.classList.remove('hidden');
       rightColumnEl.classList.remove('hidden');
@@ -2391,7 +2582,7 @@ created in the route specified in the Route Name input box.
       vscode.postMessage({ command: 'readSchema' })
     }
     if (msg.command === 'createCrudSupportDone') {
-    vscode.postMessage({ command: 'log', text: 'EXT: createCrudSupportDone confirmed' })
+    // vscode.postMessage({ command: 'log', text: 'EXT: createCrudSupportDone confirmed' })
       fieldsListEl.innerHTML = ''
       routeNameEl.value = ''
       crudSupportDoneEl.classList.remove('hidden')
@@ -2401,7 +2592,7 @@ created in the route specified in the Route Name input box.
       closeSchemaModels();
     }
     if (msg.command === 'renderSchema') {
-      vscode.postMessage({command: 'log',  text: 'EXT: renderSchema' });
+      // vscode.postMessage({command: 'log',  text: 'EXT: renderSchema' });
       renderParsedSchema(msg.payload)
       rootPath = msg.rootPath
     }
@@ -2436,12 +2627,43 @@ created in the route specified in the Route Name input box.
   }
 
   let routeName = ''
+
+  function changeLabelText(id, color, text, duration){
+    // vscode.postMessage({command:'log', text: 'changeLabelText entry point'+id})
+    // const selector = "label[for='"+ id +"']"
+    // const label = document.querySelector("label[for='routeNameId']");
+    const label = document.querySelector("label[for='"+ id +"']");
+    
+    // if(label){
+    //   vscode.postMessage({command:'log', text: 'querySelector FOUND label'})
+    // }else{
+    //     vscode.postMessage({command:'log', text: 'querySelector NO LABEL FOUND'})
+    // }
+    // Filter for text nodes only (excludes the <input> element)
+    const textNodes = Array.from(label.childNodes).filter(
+      (node) => node.nodeType === Node.TEXT_NODE
+      );
+      
+      // Update the first (and likely only) text node
+      if (textNodes.length > 0) {
+        // save the label text
+        const nodeText = textNodes[0].textContent
+        // vscode.postMessage({command:'log', text: 'found textNode '+ nodeText})
+        textNodes[0].textContent = text;
+        label.style.color = color;
+        setTimeout(() => {
+          textNodes[0].textContent = nodeText;
+          label.style.color = '';
+        }, 10000)
+      }
+  }
+  
   // a parsed schema from a Prisma ORM is sent back from the extension
   // and as it is an HTML collection we turn it into an Object with
   // entries to be destructed into individual object properties
   function renderParsedSchema(schemaModels) {
 
-    vscode.postMessage({ command: 'log', text: 'renderParsedSchema() entry point' })
+    // vscode.postMessage({ command: 'log', text: 'renderParsedSchema() entry point' })
     // get schemaContainerEl to render the schema into
     
     let markup = ''
@@ -2496,13 +2718,14 @@ created in the route specified in the Route Name input box.
         routeNameEl.value = event.target.innerText.toLowerCase()
         routeNameEl.focus()
         routeNameEl.click()
+        changeLabelText('routeNameId', 'pink', 'Change Route Name if necessary', 5000)
         return
       }
       const el = event.target
       const fieldName = el.innerText
       // let type = el.nextSibling.innerText.match(/type:\\s*(\\w+)/)?.[1];
       let type = dateTimeToDate(el.nextSibling.innerText.match(/type:(\\S+)/)?.[1])
-      vscode.postMessage({command: 'log',  text: ('clicked type', type) });
+      // vscode.postMessage({command: 'log',  text: ('clicked type', type) });
       if (!'String|Number|Boolean'.includes(type)) {
         return
       }
@@ -2552,7 +2775,7 @@ created in the route specified in the Route Name input box.
       }, 0)
     }
   }
-    // and the route name is specified
+  // and the route name is specified
   const disableCreateButton = () => {
     createBtnEl.disabled = !fields.length || !routeName
   }
@@ -2684,6 +2907,8 @@ created in the route specified in the Route Name input box.
 
   createBtnEl.addEventListener('click', () => {
     if (routeName && fields.length) {
+      // user has chance to change route name 
+      document.querySelector('.crud-support-done').innerText = 'route ' + routeNameEl.value + ' created'
       const payload = { routeName, fields, embellishments: selectedCheckboxes() }
       vscode.postMessage({ command: 'createCrudSupport', payload: payload })
     }
