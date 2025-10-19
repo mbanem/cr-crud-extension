@@ -440,11 +440,11 @@ type ARGS = {
     {#if owner}
       <CRTooltip caption='delete the item'>
         <span
-          onclick={() => {
-          btnDelete.click();
+          onclick={() => {btnDelete.click()}}
           aria-hidden={true}
           class="icon-delete"
           style:cursor={owner ? 'pointer': 'not-allowed'}
+          style:margin='0 0.5rem;'
         >
           X
         </span>
@@ -454,6 +454,7 @@ type ARGS = {
         <span
           class="icon-delete pink"
           style:cursor={owner ? 'pointer': 'not-allowed'}
+          style:margin='0 0.5rem;'
         >
           X
         </span>
@@ -567,15 +568,15 @@ function createCRInput(){
   const componentsPath = ensureComponentPath()
   if (!componentsPath) return
   const crInput = `<script lang="ts">
+  import { browser } from '$app/environment';
+  import * as utils from '$lib/utils';
+  import { onMount } from 'svelte';
   type TExportValueOn =
     | 'keypress'
     | 'keypress|blur'
     | 'enter'
     | 'blur'
     | 'enter|blur';
-  import { browser } from '$app/environment';
-  import * as utils from '$lib/utils';
-  import { onMount } from 'svelte';
 
   type PROPS = {
     title: string;
@@ -618,7 +619,7 @@ function createCRInput(){
       if (str.split(' ').length > 3) return str;
       // @ts-expect-error
       str = str.capCamelCase();
-      const arr = str.match(/s+/g);
+      const arr = str.match(/\s+/g);
       if (!arr || arr.length > 3) return str;
     } catch (err) {
       console.log('capitalizes', err);
@@ -634,7 +635,6 @@ function createCRInput(){
     // IIFE
     exportValueOn = exportValueOn.toLowerCase() as TExportValueOn;
     // make combination be with 'enter|blur' and 'keypress|blur' if inverted
-    // so the blur always follows
     const parts = exportValueOn.split('|');
     if (parts.length > 1 && parts[0] === 'blur') {
       exportValueOn = \`\${parts[1]}|\${parts[0]}\` as TExportValueOn;
@@ -643,6 +643,7 @@ function createCRInput(){
   const topPosition = \`\${-1 * Math.floor(parseInt(fontsize) / 3)}px\`;
 
   // allow pre-defined values to show up when user specify them
+  let inputValue = $state<string>('');
 
   if (browser) {
     try {
@@ -666,8 +667,8 @@ function createCRInput(){
   const onBlurHandler = (event: FocusEvent) => {
     event.preventDefault();
 
-    // no entry yet so no export is ready but is dirty -- only handle placeholder if entry is required
-    if (value === '') {
+    // no entry yet so no export is ready buy is dirty -- only handle placeholder if entry is required
+    if (inputValue === '') {
       // input is required so warn the user with pink placeholder required message
       if (required) {
         inputEl.placeholder = requiredStr;
@@ -679,6 +680,7 @@ function createCRInput(){
       }
     }
     if (exportValueOn.includes('blur')) {
+      value = inputValue;
       if (onInputIsReadyCallback) {
         onInputIsReadyCallback();
       }
@@ -691,21 +693,23 @@ function createCRInput(){
       // NOTE: reactive variable inputbox value does not updates
       // inputbox value when changed via script, so inputEl.value
       // as a workaround is updated instead
-      value = utils.capitalize(value);
+      inputEl.value = utils.capitalize(inputValue);
     }
-
+    // if keypress is Enter and exportValueOn does not include Enter we return
     if (exportValueOn.includes('enter') && event.key !== 'Enter') {
-      if (capitalize && value) {
-        value = utils.capitalize(value);
+      if (capitalize && inputValue) {
+        // inputValue = capitalizes(inputValue);
+        inputValue = utils.capitalize(inputValue);
       }
       return;
     }
     // already prevented blur|keypress and blur|enter
     // blur always follows if any case
     if (!'keypress|blur|enter|blur'.includes(exportValueOn)) {
+      inputValue = capitalizes(inputValue);
       return;
     }
-    if (value && value.length > 0) {
+    if (inputValue && inputValue.length > 0) {
       if (capitalize) {
       }
 
@@ -715,11 +719,12 @@ function createCRInput(){
         exportValueOn.includes('keypress') ||
         (exportValueOn.includes('enter') && event.key === 'Enter')
       ) {
+        value = inputValue;
 
         if (onInputIsReadyCallback) {
           onInputIsReadyCallback();
           if (clearOnInputIsReady) {
-            value = '';
+            inputValue = '';
           }
         }
       }
@@ -737,7 +742,7 @@ function createCRInput(){
     inputEl.focus();
   };
 
-  // for parent call to set input box value
+  // parent call to set input box value
   export const setInputBoxValue = (str: string, blur: boolean = false) => {
     if (blur) {
       setTimeout(() => {
@@ -745,10 +750,14 @@ function createCRInput(){
       }, 1000);
     }
     inputEl.focus();
-    value = str;
+    inputValue = str;
   };
+  // setContext('setInputBoxValue', setInputBoxValue);
   onMount(() => {
     label = document.getElementsByTagName('label')[0] as HTMLLabelElement;
+    // if (inputValue && inputEl) {
+    //   setFocus();
+    // }
   });
 </script>
 
@@ -757,7 +766,7 @@ function createCRInput(){
     bind:this={inputEl}
     type={type ? type : 'text'}
     required
-    bind:value
+    bind:value={inputValue}
     onkeyup={onKeyUpHandler}
     onfocus={onFocusHandler}
     onblur={onBlurHandler}
@@ -782,14 +791,22 @@ function createCRInput(){
   .input-wrapper {
     position: relative;
     width: max-content;
+    /* adjust label to look like placeholder */
     padding-top: 0.8rem;
     label {
       position: absolute;
+      // transform: translateY(-50%);
+      // top: calc(var(--INPUT-COMRUNNER-HEIGHT) * 0.5);
       left: 15px;
+      // top: 26px;
       font-size: var(--INPUT-COMRUNNER-FONT-SIZE);
       color: var(--INPUT-COLOR);
       background-color: var(--INPUT-BACKGROUND-COLOR);
+      // opacity: 0.5;
       transition: 0.5s;
+      // .stay-on-top {
+      //   top: -15px;
+      // }
     }
     input {
       display: inline-block;
@@ -813,6 +830,8 @@ function createCRInput(){
 
   .err {
     color: pink;
+    // border: 1px solid #808080;
+    // border-radius: 3px;
     padding: 1px 0.5rem;
   }
 </style>
@@ -993,7 +1012,7 @@ function createCRActivity(){
     users,
   }: ARGS = $props();
 
-  if (users.length === 0) {
+  if (users?.length === 0) {
     users[0] = user as UserPartial;
   }
   // svelte-ignore non_reactive_update
@@ -1021,31 +1040,23 @@ function createCRActivity(){
     return result;
   };
   let [userName, role] = $derived.by(() => {
-    let aUser = users.filter((u) => u.id === selectedUserId)[0] as UserPartial;
+    let aUser = users?.filter((u) => u.id === selectedUserId)[0] as UserPartial;
     if (aUser) {
       return [\`\${aUser?.firstName} \${aUser?.lastName}\`, aUser.role];
     } else {
       return [\`\${user.firstName} \${user.lastName}\`, user.role];
     }
   });
-  // $effect(() => {
-  //   selectBox.value = selectedUserId.slice(0, -2);
-  // });
 
   onMount(() => {
     selectedUserId = user.id as string;
-    // if (selectBox) {
-    //   selectBox.value = selectedUserId;
-    // }
   });
 </script>
 
-<!-- <pre>{JSON.stringify(users, null, 2)}</pre> -->
 <h1>
   {PageName} Page
-  {#if user?.role === 'ADMIN'}
+  {#if user?.role === 'ADMIN' && users.length > 1}
     <select bind:this={selectBox} bind:value={selectedUserId}>
-      <!-- <option value="x" selected={true}>Select an Author</option> -->
       {#each users as the_user}
         <option value={the_user.id}>
           {the_user.firstName}
@@ -1053,11 +1064,11 @@ function createCRActivity(){
         </option>
       {/each}
     </select>
+    <span class="user_name"
+      >(logged-in {user?.firstName} {user?.lastName}--{user?.role})</span
+    >
   {/if}
   <span class="user-name">{userName} {role}</span>
-  <span class="user_name"
-    >(logged-in {user.firstName} {user.lastName}--{user.role})</span
-  >
   {#key result}
     {#if result !== ''}
       <span bind:this={msgEl} class="message">{showResult()}</span>
@@ -1497,8 +1508,8 @@ CRTooltip could accept the following props, though all are optional
 
 <style>
   .child-wrapper {
-    /* position: relative; */
-    margin: 3rem 0 0 16rem; /* global position */
+    display: inline-block;
+    margin: 0;
     padding: 0;
     width: max-content;
     height: auto;
@@ -2908,7 +2919,7 @@ created in the route specified in the Route Name input box.
   createBtnEl.addEventListener('click', () => {
     if (routeName && fields.length) {
       // user has chance to change route name 
-      document.querySelector('.crud-support-done').innerText = 'route ' + routeNameEl.value + ' created'
+      document.querySelector('.crud-support-done').innerHTML = "route <span style='color:pink;'>" + routeNameEl.value + "</span>  created";
       const payload = { routeName, fields, embellishments: selectedCheckboxes() }
       vscode.postMessage({ command: 'createCrudSupport', payload: payload })
     }

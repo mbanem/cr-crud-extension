@@ -402,7 +402,8 @@ CRTooltip could accept the following props, though all are optional
 <style>
   .child-wrapper {
     /* position: relative; */
-    margin: 3rem 0 0 16rem; /* global position */
+    display: inline-block;
+    margin: 0; /* global position */
     padding: 0;
     width: max-content;
     height: auto;
