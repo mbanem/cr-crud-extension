@@ -142,21 +142,21 @@ function buttons_(){
     const cap = caption[0].toUpperCase() + caption.slice(1)
     const hid = cap !== 'Create';
     if(spinner){
-      buttons += `<CRSpinner
-        bind:button={btn${cap}}
-        spinOn={loading}
-        caption=${caption}
-        formaction="?/${caption}"
-        disabled={!formDataValid}
-        hidden={${hid}}
-      >
-      </CRSpinner>
-      `
+      buttons += `    <CRSpinner
+            bind:button={btn${cap}}
+            spinOn={loading}
+            caption=${caption}
+            formaction="?/${caption}"
+            disabled={!formDataValid}
+            hidden={${hid}}
+          >
+          </CRSpinner>
+          `
     }else{
       buttons += `<button bind:this={btn${cap}} name="${caption}" formaction="?/${caption}">${caption}</button>
-      `
+          `
     }
-      buttons + `</div>
+        buttons + `</div>
       `
     })
     return `// buttons_() called here`
@@ -200,15 +200,15 @@ function toCapitalize(name:string, type:string){
 function inputBox(name:string, type: string){
   if (embellishments_.includes('CRInput')){
     return `<CRInput title="${name}"
-      exportValueOn="enter|blur"
-      type='${inputType(name, type)}'
-      capitalize={${toCapitalize(name,type)}}
-      bind:value={snap.${name} ${asType(type)}}
-      required={true}
-      width='22.5rem'
-    >
-    </CRInput>
-    `
+        exportValueOn="enter|blur"
+        type='${inputType(name, type)}'
+        capitalize={${toCapitalize(name,type)}}
+        bind:value={snap.${name} ${asType(type)}}
+        required={true}
+        width='22.5rem'
+      >
+      </CRInput>
+      `
   }
   return `<input type="hidden" name="${name}" bind:value={snap.${name}} />
   `
@@ -431,7 +431,7 @@ type ARGS = {
       clearMessage();
     }
 
-    ${buttons_()}
+        ${buttons_()}
     }
     let owner = true;
   </script>
@@ -467,6 +467,7 @@ type ARGS = {
       ${inputBoxes}
       <div class='buttons-row'>
         ${buttons}<button onclick={clearForm}>clear form</button>
+        </div>
       </div>
     </div>
   </form>
@@ -2599,7 +2600,7 @@ created in the route specified in the Route Name input box.
       crudSupportDoneEl.classList.remove('hidden')
       setTimeout(()=>{
         crudSupportDoneEl.classList.add('hidden');
-      }, 6000)
+      }, 3000)
       closeSchemaModels();
     }
     if (msg.command === 'renderSchema') {
