@@ -434,34 +434,18 @@ type ARGS = {
         ${buttons_()}
     }
     let owner = true;
+    const toggleColor = (event: MouseEvent, caption?: string) => {
+		console.log('caption', caption)
+		const grandParent = (event.target as HTMLSpanElement)?.parentElement.parentElement;
+		
+    const style = grandParent?.parentElement?.style;
+    if (style){
+      style.color = style.color === 'red' ? 'blue' : 'red';
+    }
+  };
   </script>
 
-  {#snippet deleteIcon(owner:boolean)}
-    {#if owner}
-      <CRTooltip caption='delete the item'>
-        <span
-          onclick={() => {btnDelete.click()}}
-          aria-hidden={true}
-          class="icon-delete"
-          style:cursor={owner ? 'pointer': 'not-allowed'}
-          style:margin='0 0.5rem;'
-        >
-          X
-        </span>
-      </CRTooltip>
-    {:else}
-      <CRTooltip caption='delete the item'>
-        <span
-          class="icon-delete pink"
-          style:cursor={owner ? 'pointer': 'not-allowed'}
-          style:margin='0 0.5rem;'
-        >
-          X
-        </span>
-      </CRTooltip>
-    {/if}
-  {/snippet}
-      
+  
   <form action="?/create" method="post" use:enhance={enhanceSubmit}>
     <div class='form-wrapper'>
       ${inputBoxes}
@@ -471,14 +455,77 @@ type ARGS = {
       </div>
     </div>
   </form>
-<pre>How to use deleteIcon an HTMLSpanElement
-The delete icon X has to be rendered via render deleteIcon(true/false)
-inside a list elements item meant to be deleted specifying a boolean
-which when true allows deletion  but when false show not-allowed pointer
-and a tooltip 'owner permission'
+<div style="border:0;padding:0; color:green;">
+  This is a list item to be deleted{@render iconHandler(
+    true,
+    'delete item',
+    'fa fa-trash',
+  )}
+</div>
+<div style="border:0;padding:0; color:green;">
+  This is a list item to be deleted by not owner{@render iconHandler(
+    false,
+    'delete item',
+    'fa fa-trash',
+  )}
+</div>
+<div style="border:0;padding:0; color:blue;">
+  This is a list item for toggling color{@render iconHandler(
+    true,
+    'toggle color',
+    'fa-duotone fa-solid fa-paint-roller',
+    (event: MouseEvent) => toggleColor(event, 'toggle color'),
+  )}
+</div>
+
+{#snippet iconHandler(
+  owner: boolean,
+  caption?: string,
+  iconClass: string,
+  clickHandler?: Function | undefined,
+)}
+  {#if owner}
+    <CRTooltip {caption}>
+      <span
+        onclick={clickHandler
+          ? (event: MouseEvent) => clickHandler(event, caption)
+          : (event: MouseEvent) =>
+              event.target &&
+              event.target.parentElement.parentElement.parentElement.remove()}
+        aria-hidden={true}
+        style:cursor={owner ? 'pointer' : 'not-allowed'}
+        style="margin=0 0.5rem;font-size:20px;color:cornsilk;border:1px solid gray;border-radius:4px;padding:2px 6px;"
+      >
+        <i class={iconClass}></i>
+      </span>
+    </CRTooltip>
+  {:else}
+    <CRTooltip caption="no owner permission">
+      <span
+        style:cursor={owner ? 'pointer' : 'not-allowed'}
+        style="margin=0 0.5rem;font-size:20px;color:#c3909b;border:1px solid gray;border-radius:4px;padding:2px 6px;"
+      >
+        <i class={iconClass}></i>
+      </span>
+    </CRTooltip>
+  {/if}
+{/snippet}
+<pre>How to use an Font Awesome iconHandler -- a child of a parent
+It is rendered as @render iconHandler(boolean, caption, faIconClass, clickHandler?)
+The fist argument when true allows action to be carried on, otherwise
+it shows a 'not-allowed pointer' with tooltip 'no owner permission'.
+The caption argument is a tooltip text displayed with delay when icon is hovering.
+The faIconClass is the class name copied from an https://fontawesome.com/ page when
+searching for an icon and extracting className from icon <i class="className"
+  ></i>.
+A clickHandler is an optional function reference to be called when icon is
+clicked. As the icon is deeply buried in CRTooltip and span elements the user's 
+clickHandler, which gets mouse event, should access its grandParent wrapper as
+const parent = (event.target as HTMLSpanElement)?.parentElement.parentElement;
+There are three examples above two to delete the parent with owner and not owner
+and the third to toggle parent's color. 
 </pre>
 
-<div style='border:0;padding:0'>This is a list item to be deleted{@render deleteIcon(true)}</div>
 <style lang='scss'>
   .form-wrapper {
     display: flex;
@@ -1528,7 +1575,7 @@ CRTooltip could accept the following props, though all are optional
     outline: none;
   }
   .caption-default {
-    border: 6px solid skyblue;
+    border: 1px solid skyblue;
     border-radius: 5px;
     color: yellow;
     background-color: navy;
@@ -1537,6 +1584,7 @@ CRTooltip could accept the following props, though all are optional
     margin: 0;
     text-align: center;
     font-size: 14px;
+    line-height:14px;
     font-family: Arial, Helvetica, sans-serif;
     z-index: 10;
   }
@@ -1958,6 +2006,7 @@ export async function activate(context: vscode.ExtensionContext) {
         if (fs.existsSync(filePath)){
           const answer = await vscode.window.showWarningMessage(
             'There is a route with this name. To overwrite it?',
+            { modal: true },
             'Yes',
             'No'
           );
