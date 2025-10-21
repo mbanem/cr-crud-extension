@@ -1,74 +1,71 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-
+  import { onMount } from 'svelte'
+  import * as utils from '$lib/utils'
   type ARGS = {
-    PageName: string;
-    user: UserPartial;
-    users: UserPartial[] | [];
-    selectedUserId: string;
-    result: string;
-  };
+    PageName: string
+    user: UserPartial
+    users: UserPartial[] | []
+    selectedUserId: string
+    result: string
+  }
   let {
     PageName,
     result = $bindable(),
     selectedUserId = $bindable(),
     user,
     users,
-  }: ARGS = $props();
+  }: ARGS = $props()
 
-  if (users.length === 0) {
-    users[0] = user as UserPartial;
+  if (users?.length === 0) {
+    users[0] = user as UserPartial
   }
   // svelte-ignore non_reactive_update
-  let msgEl: HTMLSpanElement;
+  let msgEl: HTMLSpanElement
   // svelte-ignore non_reactive_update
-  let selectBox: HTMLSelectElement;
-  let timer: NodeJS.Timeout | string | number | undefined; //ReturnValue<typeof setTimeout>;
+  let selectBox: HTMLSelectElement
+  let timer: NodeJS.Timeout | string | number | undefined //ReturnValue<typeof setTimeout>;
   const killTimer = () => {
     if (timer) {
-      clearTimeout(timer);
-      timer = undefined;
+      clearTimeout(timer)
+      timer = undefined
     }
-  };
+  }
   const scheduleClearMessage = () => {
-    killTimer();
+    killTimer()
     timer = setTimeout(() => {
-      result = '';
+      result = ''
       if (msgEl) {
-        msgEl.innerText = '';
+        msgEl.innerText = ''
       }
-    }, 2000);
-  };
+    }, 2000)
+  }
   const showResult = () => {
-    scheduleClearMessage();
-    return result;
-  };
+    scheduleClearMessage()
+    return result
+  }
   let [userName, role] = $derived.by(() => {
-    let aUser = users.filter((u) => u.id === selectedUserId)[0] as UserPartial;
+    let aUser = users?.filter((u) => u.id === selectedUserId)[0] as UserPartial
     if (aUser) {
-      return [`${aUser?.firstName} ${aUser?.lastName}`, aUser.role];
+      return [`${aUser?.firstName} ${aUser?.lastName}`, aUser.role]
     } else {
-      return [`${user.firstName} ${user.lastName}`, user.role];
+      return [`${user.firstName} ${user.lastName}`, user.role]
     }
-  });
-  // $effect(() => {
-  //   selectBox.value = selectedUserId.slice(0, -2);
-  // });
+  })
 
   onMount(() => {
-    selectedUserId = user.id as string;
-    // if (selectBox) {
-    //   selectBox.value = selectedUserId;
-    // }
-  });
+    selectedUserId = user.id as string
+  })
 </script>
 
-<!-- <pre>{JSON.stringify(users, null, 2)}</pre> -->
-<h1>
-  {PageName} Page
-  {#if user?.role === 'ADMIN'}
+<svelte:head>
+  <title>{utils.capitalize(PageName)}</title>
+</svelte:head>
+<div class="activity">
+  <span style="color:gray;font-size:24px;"
+    >{utils.capitalize(PageName)} Page</span
+  >
+  {#if user?.role === 'ADMIN' && users.length > 1}
     <select bind:this={selectBox} bind:value={selectedUserId}>
-      <!-- <option value="x" selected={true}>Select an Author</option> -->
       {#each users as the_user}
         <option value={the_user.id}>
           {the_user.firstName}
@@ -76,20 +73,20 @@
         </option>
       {/each}
     </select>
+    <span class="user_name"
+      >(logged-in {user?.firstName} {user?.lastName}--{user?.role})</span
+    >
   {/if}
   <span class="user-name">{userName} {role}</span>
-  <span class="user_name"
-    >(logged-in {user.firstName} {user.lastName}--{user.role})</span
-  >
   {#key result}
     {#if result !== ''}
       <span bind:this={msgEl} class="message">{showResult()}</span>
     {/if}
   {/key}
-</h1>
+</div>
 
 <style lang="scss">
-  h1 {
+  .activity {
     display: flex;
     gap: 1rem;
     align-items: baseline;

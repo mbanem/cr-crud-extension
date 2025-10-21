@@ -337,6 +337,8 @@ type ARGS = {
   form: ActionData;
   };
   let { data, form }: ARGS = $props();
+
+  let selectedUserId = $state<string>(data.locals.user.id)
   let loading = $state<boolean>(false); // toggling the spinner
   let btnCreate: HTMLButtonElement;
   let btnUpdate: HTMLButtonElement;
@@ -444,8 +446,18 @@ type ARGS = {
     }
   };
   </script>
-
-  
+  <svelte:head>
+    <title>${routeName_} Page</title>
+  </svelte:head>
+  {#if '${embellishments_}'.includes('CRActivity')}
+    <CRActivity
+      PageName='${routeName_}'
+      bind:result
+      bind:selectedUserId
+      user={data.locals.user}
+      users={data.users}
+    ></CRActivity>
+  {/if}
   <form action="?/create" method="post" use:enhance={enhanceSubmit}>
     <div class='form-wrapper'>
       ${inputBoxes}
@@ -1044,7 +1056,7 @@ function createCRActivity(){
   if (!componentsPath) return
   const crActivity = `<script lang="ts">
   import { onMount } from 'svelte';
-
+  import * as utils from '$lib/utils'
   type ARGS = {
     PageName: string;
     user: UserPartial;
@@ -1101,8 +1113,13 @@ function createCRActivity(){
   });
 </script>
 
-<h1>
-  {PageName} Page
+<svelte:head>
+  <title>{utils.capitalize(PageName)}</title>
+</svelte:head>
+<div class="activity">
+  <span style="color:gray;font-size:24px;"
+    >{utils.capitalize(PageName)} Page</span
+  >
   {#if user?.role === 'ADMIN' && users.length > 1}
     <select bind:this={selectBox} bind:value={selectedUserId}>
       {#each users as the_user}
@@ -1122,10 +1139,10 @@ function createCRActivity(){
       <span bind:this={msgEl} class="message">{showResult()}</span>
     {/if}
   {/key}
-</h1>
+</div>
 
 <style lang="scss">
-  h1 {
+  .activity {
     display: flex;
     gap: 1rem;
     align-items: baseline;
